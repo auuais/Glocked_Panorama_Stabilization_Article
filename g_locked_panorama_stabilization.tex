@@ -559,7 +559,7 @@ We evaluate G-locked stabilization along the two axes that define its claims. Fi
 \label{sec:setup}
 \textbf{Rig and sensors.} The prototype is a rigid six-camera cylindrical rig built from DM-G15-42 global-shutter modules ($1/1.8''$ CMOS, $94.6^\circ{\times}51.3^\circ$ field of view, $30$\,fps) carrying electro-optical (EO, $1920\times1080$) and infrared (IR, $640\times512$) sensors at $60^\circ$ azimuth spacing with ${\approx}10\%$ inter-camera overlap, and a centrally mounted six-axis inertial measurement unit (IMU) sampled at ${\approx}500$\,Hz whose gyroscope and accelerometer are fused by a Madgwick orientation filter \cite{madgwick2010filter}. Unless otherwise noted, the video evaluation uses the first three cameras (cam0--cam2), which are tightly time-synchronized with the IMU; the remaining cameras exhibited a small residual capture offset and are excluded to avoid confounding the stabilization measurements.
 
-\textbf{Geometry and calibration constants.} EO frames are undistorted with radial/tangential coefficients $(k_1,k_2,p_1,p_2)=(-0.34,\,0.11,\,-1.6{\times}10^{-3},\,-2.4{\times}10^{-3})$ and reprojected onto a shared cylinder of focal parameter $f_{\mathrm{cyl}}\approx1204.5$\,px about principal point $(960,540)$; six $1920$-px strips at $10\%$ overlap form a $10\,560$-px full-resolution panorama, downscaled to the $3840\times480$ streaming target realized on the FPGA. The pitch-to-vertical-translation factor $k_p$ (the $\Delta y_i=-k_p\beta_i$ term of Section~\ref{sec:affine}) was calibrated to $17.44$\,px/deg by tracking an ArUco marker through controlled pitch; gyroscope bias was removed at $(-2.84,\,0.74,\,-1.00){\times}10^{-3}$\,rad/s, and roll/pitch corrections are clamped to $\pm5^\circ$ to preserve affine linearity and avoid border loss.
+\textbf{Geometry and calibration constants.} EO frames are undistorted with radial/tangential coefficients $(k_1,k_2,p_1,p_2)=(-0.34,\,0.11,\,-1.6{\times}10^{-3},\,-2.4{\times}10^{-3})$ and reprojected onto a shared cylinder of focal parameter $f_{\mathrm{cyl}}\approx1204.5$\,px about principal point $(960,540)$; six $1920$-px strips at $10\%$ overlap form a $10\,560$-px full-resolution panorama, downscaled to the $3840\times480$ streaming target realized on the FPGA. The pitch-to-vertical-translation factor $k_p$ (the $\Delta y_i=-k_p\beta_i$ term of Section~\ref{sec:affine}) was calibrated to $17.44$\,px/deg by tracking an ArUco marker through controlled pitch; gyroscope bias was removed at $(-2.84,\,0.74,\,-0.97){\times}10^{-3}$\,rad/s, and roll/pitch corrections are clamped to $\pm5^\circ$ to preserve affine linearity and avoid border loss. Table~\ref{tab:sysparams} in the Appendix tabulates the complete parameter set, and Table~\ref{tab:offsets} lists a representative per-camera extrinsic-offset and affine-correction instance for the full six-camera rig.
 
 \textbf{Datasets.} For stitching we use six static EO and five static IR controlled-orientation cases, each comprising the raw per-camera frames, the calibration parameters, and the system's own stabilized/unstabilized panoramas. For stabilization we use three $60$\,s, $30$\,fps captures with synchronized IMU logs: one indoor and two outdoor sequences (denoted \emph{Indoor}, \emph{Outdoor-1}, \emph{Outdoor-2}).
 
@@ -753,6 +753,61 @@ The paper also formalized the hardware story behind the algorithm. The proposed 
 In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
 
 \appendices
+\section{System and Calibration Parameters}
+\label{app:params}
+This appendix tabulates the concrete system constants referenced in Section~\ref{sec:setup}, so that the geometric and photometric pipeline (undistortion, cylindrical projection, and affine pre-alignment) can be reproduced without re-deriving values from the prose.
+
+Table~\ref{tab:sysparams} lists the EO camera intrinsics, lens-distortion coefficients, and the cylindrical/panorama geometry constants shared by every camera on the rig; these are physical-rig properties and are held fixed across all experiments in Section~\ref{sec:experiments}.
+
+\begin{table}[h]
+\caption{EO camera intrinsic, distortion, and cylindrical/panorama geometry parameters.}
+\label{tab:sysparams}
+\centering
+\footnotesize
+\begin{tabular}{@{}lc@{}}
+\toprule
+Parameter & Value \\
+\midrule
+Sensor / native resolution & DM-G15-42, $1920\times1080$ \\
+Horizontal / vertical FoV & $94.6^\circ$ / $51.3^\circ$ \\
+Focal length $f_x=f_y$ & $1204.51$\,px \\
+Principal point $(c_x,c_y)$ & $(960.0,\,540.0)$\,px \\
+Radial coefficients $(k_1,k_2,k_3)$ & $(-0.3437,\ 0.1055,\ 0.0)$ \\
+Tangential coefficients $(p_1,p_2)$ & $(-1.56,\ -2.42){\times}10^{-3}$ \\
+Cameras / azimuth spacing & $6$ / $60^\circ$ \\
+Inter-camera overlap & $10\%$ ($192$\,px of $1920$) \\
+Full-resolution panorama width & $10\,560$\,px \\
+FPGA streaming panorama (EO) & $3840\times480$ \\
+Pitch-to-translation factor $k_p$ & $17.44$\,px/deg \\
+Roll/pitch correction clamp & $\pm5^\circ$ \\
+Gyroscope bias $(b_x,b_y,b_z)$ & $(-2.84,\ 0.74,\ -0.97){\times}10^{-3}$\,rad/s \\
+IMU sample rate & ${\approx}500$\,Hz \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:offsets} lists a representative calibration instance for the full six-camera configuration: the per-camera extrinsic offsets recovered by the hand--eye procedure of Section~\ref{sec:setup} (expressed as yaw/pitch/roll relative to the rig), together with the resulting instantaneous affine pre-alignment (in-plane roll angle and vertical shift) applied to each camera for one representative rig orientation. This instance illustrates the full six-camera configuration described in Section~\ref{sec:algorithm}; it is distinct from the three-camera (cam0--cam2) sequences used for the stabilization measurements of Section~\ref{sec:stabcompare}, which report their own per-capture IMU logs.
+
+\begin{table}[h]
+\caption{Representative per-camera extrinsic offsets and resulting affine pre-alignment for one six-camera rig orientation (IMU: yaw $0.0^\circ$, pitch $-0.75^\circ$, roll $5.25^\circ$).}
+\label{tab:offsets}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Camera & \multicolumn{3}{c}{Extrinsic offset} & Affine pre-alignment \\
+ & Yaw & Pitch & Roll & (angle, $\Delta y$) \\
+\midrule
+Cam 0 & $0.0^\circ$   & $-0.75^\circ$ & $-0.5^\circ$ & $-5.25^\circ$, $-26.0$\,px \\
+Cam 1 & $60.0^\circ$  & $0.0^\circ$   & $0.0^\circ$  & $-1.98^\circ$, $-85.0$\,px \\
+Cam 2 & $120.0^\circ$ & $0.5^\circ$   & $0.0^\circ$  & $3.28^\circ$, $-64.0$\,px \\
+Cam 3 & $180.0^\circ$ & $0.25^\circ$  & $0.5^\circ$  & $5.25^\circ$, $17.0$\,px \\
+Cam 4 & $240.0^\circ$ & $-4.0^\circ$  & $0.0^\circ$  & $1.98^\circ$, $16.0$\,px \\
+Cam 5 & $300.0^\circ$ & $-0.5^\circ$  & $0.0^\circ$  & $-3.28^\circ$, $64.0$\,px \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Results, Figures, and Reproducibility Index}
 \label{app:index}
 Table~\ref{tab:figindex} indexes the quantitative artifacts and the figures used in this paper. Items marked \emph{included} are rendered from measured data; items marked \emph{TikZ} are vector schematics drawn natively in the manuscript source.
@@ -771,6 +826,8 @@ Tab.~\ref{tab:ripple} (ripple/IHR) & included & horizon-ripple metric, 3 capture
 Tab.~\ref{tab:stabchecks} (ArUco/smoothness) & included & ArUco track + path metrics \\
 Tab.~\ref{tab:resources} (footprint) & included & on-chip memory model \\
 Tab.~\ref{tab:arch} (design space) & included & V10/V17/V19 architecture reports \\
+Tab.~\ref{tab:sysparams} (system params) & included & camera/lens/rig calibration records \\
+Tab.~\ref{tab:offsets} (per-cam offsets) & included & six-camera hand--eye calibration instance \\
 Fig.~\ref{fig:imu} (IMU filtering) & included & Madgwick vs.\ accel/gyro, lag (real IMU log) \\
 Fig.~\ref{fig:ripple} (ripple 3-up) & included & frame grab, gravity-line composite \\
 Fig.~\ref{fig:stitch} (stitch panels) & included & per-seam comparison panels \\
