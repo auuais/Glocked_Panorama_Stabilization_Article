@@ -1,0 +1,414 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{balance}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{soul}
+\sethlcolor{yellow}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\todoauthor}[1]{\textcolor{blue}{[AUTHOR NOTE: #1]}}
+\newcommand{\etal}{\textit{et al.}}
+
+\title{G-Locked Panorama Stabilization: A Streaming IMU-Locked Algorithm for Real-Time Cylindrical Panorama Stabilization and FPGA-Oriented Deployment}
+
+\author{Author names to be inserted%
+\thanks{This draft is prepared from the implementation design materials, FPGA simulation code, and additional literature review. Replace the author block, affiliations, acknowledgments, and experimental numbers before submission.}}
+
+\markboth{IEEE Transactions Draft, April 2026}{Author \MakeLowercase{\textit{et al.}}: G-Locked Panorama Stabilization}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper presents \emph{G-locked panorama stabilization}, a geometry-aware stabilization algorithm for multi-camera cylindrical panorama systems. The method targets a failure mode that is not adequately addressed by conventional monocular video stabilization: when a rigid multi-camera panoramic rig undergoes roll and pitch motion, each camera no longer observes the intended cylindrical cross-section, and the stitched panorama exhibits spatially coherent ripple, waviness, and seam inconsistency. Instead of estimating motion from frame content and compensating the panorama only after stitching, the proposed method uses inertial measurements to lock each camera view back to its intended geometric slice before cylindrical projection and panorama assembly. The algorithm combines offline IMU-camera extrinsic calibration with runtime IMU orientation fusion and a low-complexity per-camera affine correction that preserves vertical alignment while remaining suitable for deterministic hardware implementation.
+
+The second contribution is architectural. Beyond the original proof-of-concept Python implementation, this paper formalizes a streaming, line-buffer-based pipeline designed for FPGA realization. The implementation precomputes base maps, applies lightweight per-frame stabilization to those maps, schedules work by source-row buckets, and renders output with only a two-line source cache per camera. Random write behavior is confined to an on-chip destination staging buffer, while completed rows are burst-written to memory using slice ping-pong buffering. This design removes the need for frame-buffer-style random source access and avoids the memory and bandwidth bottlenecks that commonly arise in feature-based, optical-flow-based, and post-stitch stabilization pipelines.
+
+Relative to prior work, the proposed method occupies a distinct design point: unlike feature-based or learning-based methods, it does not depend on scene texture, long feature tracks, or dense motion inference; unlike classical gyro-only monocular stabilizers, it explicitly models multi-camera cylindrical panorama geometry; unlike post-stitch 360$^\circ$ stabilizers, it corrects distortion before seam formation; and unlike conventional hardware stitching engines based on fixed homographies, it supports frame-synchronous inertial stabilization without abandoning deterministic streaming constraints. The resulting framework provides a strong basis for embedded panoramic surveillance, situational awareness, and low-latency vision systems where resource predictability is as important as geometric quality.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Panorama stabilization, video stabilization, multi-camera systems, inertial measurement unit, FPGA, streaming architecture, cylindrical projection, image stitching, hardware-software co-design.
+\end{IEEEkeywords}
+
+\section{Introduction}
+Panoramic imaging systems based on multiple fixed cameras are attractive for surveillance, navigation, robotics, maritime sensing, and situational awareness because they can deliver wide-field or full 360$^\circ$ scene coverage at low optical complexity. However, panoramic output quality degrades rapidly when the rig undergoes angular motion. In a cylindrical panorama system, roll and pitch do not merely produce the usual monocular frame jitter; instead, they alter the effective cross-section observed by each camera, causing stitched structures to bend, seams to drift, and the panorama to exhibit a characteristic wave-like geometric distortion. This phenomenon persists even when camera placement is fixed and inter-camera stitching is otherwise well calibrated, because the core defect is geometric inconsistency induced by rig orientation rather than poor calibration alone.
+
+Most established video stabilization methods were developed for monocular cameras. Classical content-driven approaches estimate inter-frame transforms from sparse features, trajectories, optical flow, or local meshes, and then smooth the recovered motion before frame warping \cite{liu2013bundled,liu2016meshflow,yu2021selfie,lee2021deep3d}. These methods can produce visually pleasing results, but they are intrinsically scene-dependent. Their performance degrades under low texture, low light, motion blur, parallax, and large foreground motion. They also usually assume access to whole frames, frame neighborhoods, or feature histories, which makes them fundamentally awkward to map onto strict scanline-streaming hardware.
+
+Sensor-assisted methods improve robustness by using gyroscopes or inertial sensors for motion estimation \cite{karpenko2011gyro,han2021tmc,shi2022deepfvs,yu2025sensorflow}. Their key advantage is that inertial rotation estimation is independent of image texture and can be computed with low latency. Yet most of this literature still focuses on monocular stabilization, virtual camera smoothing, or post-capture frame warping. The geometric problem in a stitched cylindrical panorama is different: the goal is not only to smooth apparent motion, but to restore each view to the correct cylindrical slice before the panorama is formed.
+
+This paper develops that idea into a complete algorithmic and architectural contribution. The algorithm uses an IMU to estimate runtime platform orientation, maps that orientation into each camera coordinate frame using offline-calibrated extrinsics, and applies an inverse geometric correction before cylindrical projection and feather blending. The result is an IMU-locked stabilization strategy that is locked to the intended panorama geometry rather than to scene features; hence the term \emph{G-locked}. In parallel, the paper formalizes a line-buffer-based hardware pipeline in which stabilization, remapping, and stitching are organized around deterministic row buckets, two-line source caches, bounded on-chip staging, and burst-based DDR transactions rather than frame-buffer-style random source access.
+
+The main contributions are as follows:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item We define the panoramic stabilization problem geometrically for a rigid multi-camera cylindrical rig and show why monocular stabilization assumptions are insufficient for this setting.
+  \item We propose G-locked panorama stabilization, which fuses IMU orientation with per-camera extrinsic offsets and compensates roll/pitch-induced panorama deformation using a low-complexity affine approximation before cylindrical projection and stitching.
+  \item We present a streaming FPGA-oriented realization based on precomputed base maps, source-row bucket scheduling, RowRun linearization, a two-line source cache, an active destination-row window, and slice ping-pong DDR writeback.
+  \item We provide a detailed comparison against feature-based, visual-inertial, 360$^\circ$/post-stitch, and hardware stitching approaches, emphasizing the proposed method's distinct balance of geometry fidelity, latency, memory boundedness, and hardware realizability.
+\end{enumerate}
+
+\section{Related Work}
+\subsection{Feature-Based and Content-Driven Video Stabilization}
+A large body of work formulates video stabilization as motion estimation followed by path smoothing and frame warping. Early systems relied on global 2D transforms such as translation, similarity, affine, or homography estimated from feature correspondences. Later methods introduced spatially varying warps to better handle parallax and foreground motion. Bundled Camera Paths model motion using a mesh-based spatially varying representation and optimize a bundle of camera paths rather than a single global transform \cite{liu2013bundled}. MeshFlow further reduced online latency by representing sparse motion on a mesh and enabling one-frame-latency online stabilization \cite{liu2016meshflow}. Recent learning-based approaches use optical flow, depth, dense warps, or sequence models to infer stabilizing transformations directly from video \cite{lee2021deep3d,yu2021selfie,zhang2023minimum,james2023globalflow}.
+
+These methods are powerful, but their resource profile is mismatched to an FPGA-first panoramic system. Reliable feature extraction, matching, RANSAC, trajectory optimization, or dense flow inference typically requires whole-frame access, frame history, and scene-dependent control flow. The target architecture in the present work is deliberately the opposite: source pixels arrive sequentially, only two source scanlines are cached at once, and random source reads from DDR are avoided. This makes full content-driven stabilization structurally expensive even before considering quality issues under low-texture or high-speed motion.
+
+\subsection{Gyroscope-Based and Visual-Inertial Stabilization}
+Gyroscope-based stabilization has long been attractive because it estimates camera rotation independently of scene appearance. Karpenko \etal\ showed that gyro measurements can drive real-time stabilization and rolling-shutter correction with high robustness and modest computation, particularly under low light and large foreground motion \cite{karpenko2011gyro}. Han \etal\ later proposed a visual-inertial stabilization framework that uses the gyroscope for rotation and features for translation, thereby reducing the visual estimation problem from six degrees of freedom to three and lowering the computational burden of CV processing \cite{han2021tmc}. More recent fusion methods such as Deep Online Fused Video Stabilization and SensorFlow combine sensor measurements with optical flow or learned residual correction, attempting to preserve the robustness of sensor-based motion while adapting to scene depth and parallax \cite{shi2022deepfvs,yu2025sensorflow}.
+
+These approaches are highly relevant, especially because they confirm the value of using inertial data for fast, robust rotation estimation. However, they still target monocular or post-capture stabilization. Their warps are usually defined on a single image plane or on dense frame motion. They do not explicitly address the special case where multiple fixed cameras jointly sample a cylindrical panorama and where stabilization must preserve cross-camera geometric consistency before seam composition.
+
+\subsection{Panoramic and 360$^\circ$ Video Stabilization}
+Work on 360$^\circ$ stabilization recognizes that wide-FOV and spherical imagery require different motion models than narrow-FOV video. Kopf proposed a 360$^\circ$ video stabilization method using a hybrid 3D--2D formulation and a deformable rotation model to handle shake, rolling shutter, and small translational effects efficiently \cite{kopf2016omnistab}. Arora and Kwatra specifically studied first-person 360$^\circ$ video stabilization for reducing viewer discomfort in immersive playback \cite{arora2018stab360}. Tang \etal\ later considered joint stabilization and direction optimization for 360$^\circ$ videos \cite{tang2018joint360}. These methods are important because they show that spherical and omnidirectional video require dedicated treatment.
+
+Nevertheless, most such techniques operate on already captured spherical or stitched panoramic video. In contrast, the present work stabilizes a rigid multi-camera cylindrical rig \emph{before} final panorama assembly, which changes both the problem formulation and the architecture. The goal is not only to smooth the final panorama, but to prevent orientation-induced seam and slice deformation from arising in the first place.
+
+\subsection{Multi-Camera Panoramic Video Stabilization and Stitching}
+Hamza \etal\ explicitly addressed panoramic video stabilization for multi-camera mobile platforms and recognized that different regions of a panorama may exhibit different jitter contributions from different cameras \cite{hamza2015panovideo}. Their formulation is one of the closest conceptual predecessors because it treats stitched panoramic video as a distinct stabilization problem rather than a trivial extension of monocular methods. More recently, StabStitch integrated video stitching and stabilization into an unsupervised online framework, revealing the issue of warping shake when image-stitching methods are extended to video and proposing a unified smoothing model for stitched trajectories \cite{nie2024stabstitch}. These works are highly relevant, but they still remain post-warp or post-stitch optimization frameworks and do not impose strict hardware streaming constraints.
+
+The proposed G-locked method differs in two ways. First, it is explicitly tied to the physical geometry of a fixed cylindrical rig and to per-camera inertial pose compensation. Second, it is designed from the outset to admit a line-buffer-based streaming implementation, which strongly constrains admissible motion models and memory movement.
+
+\subsection{Hardware-Oriented Panorama Engines}
+Real-time stitching hardware has been studied in automotive and surveillance settings. Suk \etal\ proposed a fixed-homography SW/HW image stitching engine for motor vehicles and reported that descriptor-based matching methods such as SIFT and SURF carry excessive computational load for low-power systems; their hardware engine instead used fixed homographies and a linear transform of pixel positions to reduce complexity by more than 90\% relative to conventional implementations \cite{suk2015hwstitch}. Jia \etal\ later presented an FPGA image stitching and fusion circuit that emphasized seam optimization and real-time performance \cite{jia2024fpga}. These works demonstrate that mapping and blending can be implemented efficiently in hardware when the warp model is fixed or otherwise simple.
+
+However, traditional hardware stitchers usually assume static inter-camera transforms or fixed homographies. They do not solve the problem addressed here: how to inject frame-synchronous inertial stabilization into a panoramic pipeline while keeping the source side strictly streaming and without exploding on-chip memory or DDR bandwidth.
+
+\section{Problem Formulation and Geometric Motivation}
+Consider a rigid panoramic rig composed of $N$ fixed cameras distributed around a cylindrical field of view. Under nominal conditions, each camera contributes a calibrated strip to the cylindrical panorama. If the rig undergoes yaw, the panorama largely shifts along the cylinder and can often be handled as a horizontal phase motion. Roll and pitch are more problematic. They rotate each camera's observation plane with respect to the intended cylindrical cross-section; therefore, the slice that should project as vertically aligned content is instead sampled from a rotated plane. When stitched, this manifests as bent verticals, seam drift, and a ripple-like deformation across the panorama.
+
+This phenomenon is qualitatively different from simple frame shake in a monocular camera. In a single image, stabilization seeks a visually smoother virtual camera path. In a multi-camera cylinder, stabilization must preserve the geometric compatibility of all strips with a common cylindrical surface. A monocular feature-based warp may suppress local jitter but still leave the panorama globally inconsistent. Likewise, post-stitch stabilization can smooth the already formed panorama while failing to undo the pre-stitch geometric misregistration that created seam and ripple artifacts.
+
+The issue is therefore not simply local shake or temporal jitter in one image plane; it is geometric inconsistency across multiple views. This motivates a stabilization strategy that is tied directly to rig orientation and applied before cylindrical projection and blending. The proposed method is called \emph{G-locked} because it locks the recovered imagery back to the rig's intended panorama geometry rather than to scene features, optical flow, or a post-hoc virtual camera trajectory.
+
+\section{Proposed G-Locked Panorama Stabilization Algorithm}
+\subsection{System Overview}
+The algorithm has two stages:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item \textbf{Offline calibration}: estimate camera intrinsics and the fixed IMU-to-camera orientation offsets for all cameras.
+  \item \textbf{Runtime stabilization}: acquire IMU orientation, map it into each camera frame, derive a low-complexity affine correction, and apply that correction before cylindrical projection, cropping, and blending.
+\end{enumerate}
+
+An earlier proof-of-concept already formalized the sequence of undistortion, affine stabilization, cylindrical projection, cropping, and feather blending. The later C++/FPGA-oriented realization preserves the same core geometric idea while reorganizing execution into a deterministic streaming schedule.
+
+\subsection {\hl{Shared Cylindrical Reprojection and Azimuth-Dependent Pre-Alignment}}
+The core novelty of the proposed algorithm is that the cylindrical reprojection is \emph{not} camera-specific. A single cylindrical projection is computed once from one intrinsic parameter set $(f_x,f_y,c_x,c_y)$ and one field-of-view specification. This defines a shared base map
+\begin{equation}
+M_{\mathrm{cyl}}:(u,v) \mapsto (b_x(u,v), b_y(u,v)),
+\label{eq:sharedmap2}
+\end{equation}
+which is reused across all cameras. In other words, the cameras do not each own a separate cylindrical reprojection; they all use the same gravity-aligned cylindrical surface. This shared-map design is desirable because it minimizes memory duplication, preserves a uniform scheduler, and keeps the hardware pipeline deterministic.
+
+The geometric problem appears when the rig is no longer level. The shared cylindrical map assumes that the camera rig is aligned with gravity and looking straight ahead with respect to the cylindrical surface. If the rig pitches by an angle $\theta$, then adjacent cameras no longer observe the same scene point at the same vertical position in their local image planes. The cylindrical map itself remains unchanged, so without any pre-alignment, it projects all cameras as if they had been acquired under the level-rig assumption. The resulting seam error is therefore not caused by the cylindrical reprojection formula; it is caused by feeding that shared reprojection with images whose local orientations are no longer mutually aligned.
+
+Let camera $i$ be mounted at azimuth $\phi_i$ around the rig. A global rig pitch does not remain a pure pitch in every camera frame. Expressing the same global rotation in the local coordinate frame of camera $i$ yields
+\begin{equation}
+R_i^{\mathrm{loc}}(\theta,\phi_i)=R_z(-\phi_i)\,R_{\mathrm{pitch}}(\theta)\,R_z(\phi_i).
+\label{eq:localrot2}
+\end{equation}
+Using the small-angle approximation, the local perturbation decomposes as
+\begin{equation}
+R_i^{\mathrm{loc}}(\theta,\phi_i) \approx I + \theta\big(\cos\phi_i\,G_p + \sin\phi_i\,G_r\big),
+\label{eq:generator_decomp2}
+\end{equation}
+where $G_p$ and $G_r$ are the pitch and roll generators in the local camera frame. Therefore, the local pitch and roll components satisfy
+\begin{equation}
+\beta_i \approx \theta\cos\phi_i,
+\qquad
+\alpha_i \approx \theta\sin\phi_i.
+\label{eq:alphabeta2}
+\end{equation}
+
+Equation \eqref{eq:alphabeta2} explains the observed behavior. For a forward-looking camera ($\phi_i=0^\circ$), the local roll component vanishes and the dominant effect is vertical displacement induced by local pitch. For a side camera ($\phi_i=60^\circ$), the same global pitch decomposes into both vertical displacement and a nonzero local in-plane roll. For the opposite camera ($\phi_i=180^\circ$), the local roll again vanishes while the pitch term changes sign. Hence, a single global rig pitch produces different local corrections for cameras at different azimuths.
+
+The seam consequence can be stated explicitly. For two adjacent cameras $i$ and $j$, the first-order vertical mismatch and relative in-plane rotation at the overlap seam are
+\begin{align}
+\delta_y^{(i,j)} &\approx k_p\big(\beta_i-\beta_j\big)=k_p\theta\big(\cos\phi_i-\cos\phi_j\big),
+\label{eq:seamdy2}\\
+\delta_{\alpha}^{(i,j)} &\approx \alpha_i-\alpha_j=\theta\big(\sin\phi_i-\sin\phi_j\big),
+\label{eq:seamdalpha2}
+\end{align}
+where $k_p$ is the pitch-to-vertical-shift factor after image scaling. Without stabilization, all cameras use the identity pre-transform, so the shared cylindrical map projects these mismatched image planes directly into the panorama, producing vertical and rotational seam misalignment. The novelty of the proposed method is therefore \emph{not} per-camera cylindrical reprojection. The novelty is per-camera \emph{pre-alignment} before a shared reprojection: each camera receives its own local roll and vertical-shift correction, but all of them still pass through one common cylindrical map.
+
+\subsection{Offline IMU-Camera Spatial Alignment}
+Let $R_{\mathrm{imu}}(t)$ denote the runtime orientation of the IMU in a global or rig-centered reference frame. For each camera $i$, offline calibration estimates a fixed extrinsic orientation offset $R_{\mathrm{off},i}$ between the IMU and the camera. In practice, this offset may be stored through Euler-angle parameters or an equivalent rotation matrix:
+\begin{equation}
+R_{\mathrm{off},i} = R_z(\psi_i) R_y(\theta_i) R_x(\phi_i).
+\label{eq:roff}
+\end{equation}
+
+At runtime, the instantaneous orientation of camera $i$ is obtained by composing the IMU orientation with the pre-calibrated offset. The exact multiplication order depends on the chosen coordinate convention; in the implementation, the sensor orientation is converted into per-camera roll, pitch, and yaw values using preloaded per-camera offsets before stabilization parameters are generated. We denote this composition abstractly as
+\begin{equation}
+R_i(t) = \mathcal{C}\big(R_{\mathrm{imu}}(t), R_{\mathrm{off},i}\big),
+\label{eq:composition}
+\end{equation}
+where $\mathcal{C}(\cdot)$ is the convention-consistent composition operator.
+
+\subsection{Affine Approximation of Orientation Compensation}
+The full 3D rotation is not directly applied as a full projective warp to each image. Instead, the dominant panorama distortion is compensated by extracting the local in-plane roll component and a pitch-induced vertical displacement term. Let $\alpha_i$ be the extracted local roll angle for camera $i$ and let $\Delta y_i = -k_p\beta_i$ be the vertical displacement induced by the local pitch component $\beta_i$. Then the stabilized image can be generated through an affine transform about the principal point $(c_x,c_y)$:
+\begin{equation}
+A_i =
+\begin{bmatrix}
+\cos\alpha_i & \sin\alpha_i & t_{x,i} \\
+-\sin\alpha_i & \cos\alpha_i & t_{y,i}
+\end{bmatrix},
+\label{eq:affine}
+\end{equation}
+with
+\begin{align}
+ t_{x,i} &= c_x - c_x\cos\alpha_i - (c_y + \Delta y_i)\sin\alpha_i, \\
+ t_{y,i} &= c_y + c_x\sin\alpha_i - (c_y + \Delta y_i)\cos\alpha_i.
+\end{align}
+
+Equation \eqref{eq:affine} is the practical realization of the novelty discussed above. The cylindrical map remains shared, but each camera receives its own local pre-alignment through $\alpha_i$ and $\Delta y_i$. Thus, the algorithm cancels the seam-forming terms in \eqref{eq:seamdy2}--\eqref{eq:seamdalpha2} before the common cylindrical projection is applied.
+
+\subsection{Undistortion and Cylindrical Projection}
+For each camera image $I_i$, undistortion is applied first using the camera's radial and tangential distortion parameters. Let $U_i$ denote the undistorted frame. Using the standard radial-plus-tangential remapping,
+\begin{align}
+ r^2 &= x_d^2 + y_d^2, \\
+ D_{\mathrm{radial}} &= 1 + k_1 r^2 + k_2 r^4 + k_3 r^6,
+\end{align}
+followed by tangential correction and bilinear resampling.
+
+After affine stabilization, the corrected image $S_i$ is cylindrically projected. Using an effective cylindrical focal parameter $f_{\mathrm{cyl}}$, the projection can be written in the form
+\begin{align}
+ \vartheta &= \frac{x - c_x + x_{\mathrm{shift}}}{f_{\mathrm{cyl}}}, \\
+ h &= \frac{y-c_y}{f_{\mathrm{cyl}}},
+\end{align}
+then
+\begin{align}
+ X &= \sin\vartheta,
+ &Y &= h,
+ &Z &= \cos\vartheta,
+\end{align}
+and finally
+\begin{align}
+ x_{\mathrm{src}} &= f_x \frac{X}{Z} + c_x, \\
+ y_{\mathrm{src}} &= f_y \frac{Y}{Z} + c_y.
+\end{align}
+This projection model is then followed by cropping and feather blending in the proposed pipeline.
+
+\subsection{Panorama Assembly and the G-Locked Principle}
+Let $C_i$ denote the cylindrically projected strip from camera $i$, and let $\Omega_i$ denote its valid output domain after cropping. The panorama $P$ is assembled by placing adjacent strips into the cylindrical canvas and feather blending overlap regions. The crucial point is that stabilization occurs \emph{before} this step. Hence, when the strips are blended, each one has already been rotated and shifted back toward the intended cylindrical slice. This is the defining G-locked principle: the correction is performed in the per-camera domain where orientation errors are still physically interpretable and before they turn into seam or ripple artifacts in the panorama.
+
+\subsection{Why the Method is Distinct}
+The proposed method differs fundamentally from existing stabilization paradigms:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item It is not \emph{feature-locked}: no runtime keypoint extraction, matching, RANSAC, or dense flow is required for stabilization.
+  \item It is not purely \emph{gyro-locked} in the monocular sense: the goal is not only to smooth apparent rotation in one image plane, but to preserve cross-camera cylindrical compatibility.
+  \item It is not \emph{post-stitch smoothing}: the algorithm corrects each strip before seam formation.
+  \item It is not a generic homography engine: the warp is induced by precomputed base maps plus lightweight per-frame inertial parameters and remains compatible with line-buffered streaming.
+\end{itemize}
+
+\section{FPGA-Oriented Streaming Realization}
+\subsection{From Proof-of-Concept to Streaming Architecture}
+The original proof-of-concept validated the geometry of the method in Python/CV-style processing. The later implementation reorganized the same algorithmic intent into an FPGA-friendly pipeline. The central architectural constraint is that a rendered output pixel may sample from only \emph{two source scanlines at a time}; random source reads from DDR are not part of the source-side design. This constraint is the opposite of feature-based or dense-flow pipelines, which implicitly rely on frame-resident data structures and irregular memory access.
+
+\subsection{Base Maps and Per-Frame Stabilization Parameters}
+Rather than recomputing a full warp for each pixel every frame, the system precomputes base maps in source space. For each destination pixel $(o_x,s_y)$, the base maps store source coordinates $(b_x,b_y)$ in Q16.16 fixed-point form. At runtime, stabilization modifies the base coordinates with a small number of per-camera parameters:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item a vertical shift derived from pitch and yaw translation factors,
+  \item Q1.15 cosine/sine terms derived from the roll angle,
+  \item the principal point and bounds for the current mode.
+\end{enumerate}
+The runtime path computes per-camera pitch-to-translation and roll cosine/sine values once per frame and then applies them to the shared base-map coordinates during scheduling and rendering.
+
+\subsection{Bucketed Scheduling and RowRuns}
+The most important architectural idea in V19 is the \emph{source-row bucket}. Let $(a_x,a_y)$ denote the stabilized coordinates after applying runtime inertial parameters to the base map. Define
+\begin{equation}
+ y_0 = \lfloor a_y \rfloor.
+\end{equation}
+All destination pixels whose stabilized source coordinates share the same bucket $y_0$ can be rendered using only source rows $y_0$ and $y_0+1$. This enables a strict two-line cache.
+
+To avoid evaluating the stabilized mapping independently for every output pixel, the scheduler groups contiguous output pixels into \emph{RowRuns}. A RowRun represents a contiguous set of pixels that all map to the same bucket and can be approximated by a linear model
+\begin{align}
+ a_x(i) &= a_{x,0} + i\,\delta_x, \\
+ a_y(i) &= a_{y,0} + i\,\delta_y,
+\end{align}
+where the deltas are quantized to Q12.4 fixed-point and the run is extended until the linear predictor exceeds a tolerance or leaves the bucket. This piecewise linearization is a key novelty of the streaming realization: it turns expensive per-pixel transform evaluation into a bounded schedule-plus-render contract.
+
+\subsection{Memory Structures}
+The line-buffer realization revolves around four fixed architectural blocks:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item \textbf{LineCache}: a two-line YUV422 source cache per camera, holding rows $y_0$ and $y_0+1$.
+  \item \textbf{RowWindow}: an on-chip destination staging buffer for active output rows, which contains all random write behavior.
+  \item \textbf{Schedule scratch}: storage for emitted RowRuns.
+  \item \textbf{Slice ping-pong}: a 32-row output buffer that converts completed rows into sequential DDR bursts.
+\end{enumerate}
+
+For a representative EO panorama configuration, the estimated on-chip memory footprint is about 1.93 MB in total, including roughly 46 kB for the six-camera two-line caches, 1.38 MB for the active RowWindow, 492 kB for the 32-row slice ping-pong, and only a small scratch area for scheduling metadata, while the precomputed maps remain in DDR and are accessed row-wise by burst. This bounded memory story is central to why the method is deployable in FPGA fabric.
+
+\subsection{Streaming Storyline}
+The end-to-end pixel movement can be summarized as follows:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item Initialize mode, geometry, and precomputed maps.
+  \item Sequentially ingest source scanlines into the two-line cache.
+  \item Compute per-frame stabilization parameters from IMU measurements and camera offsets.
+  \item For each bucket $y_0$, schedule only those output pixels whose stabilized coordinates satisfy $\lfloor a_y \rfloor = y_0$.
+  \item Render RowRuns using the two cached scanlines and write the results into RowWindow.
+  \item Once an output row is complete, optionally blend overlapping strips and copy the row into the active slice buffer.
+  \item When the slice fills or a discontinuity occurs, burst-write the slice to DDR and toggle the ping-pong buffer.
+\end{enumerate}
+
+This pipeline is deterministic, streamable, and mode-stable: the same memory movement pattern is reused for panorama mode and undistorted single-camera modes, with only map selection, blending enable, and output target region changed.
+
+\subsection{MCU-FPGA Interface and Sensor-Synchronous Operation}
+The runtime inertial parameters are transported from the MCU to the FPGA as quantized control values. Roll and pitch are encoded as signed 16-bit centi-degree quantities, while configuration values such as cylindrical FOV, crop scales, pitch-to-translation factor, yaw-to-translation factor, overlap, and feather strength are represented in fixed-point banks. The implementation further uses VSYNC-gated orientation pushes so that pose updates are synchronized with panorama-plus-stabilization modes and are not broadcast unnecessarily in other display modes. This design is consistent with the paper's low-latency embedded positioning: the stabilizer can receive the latest IMU pose at frame cadence without refactoring the whole pipeline around software control.
+
+\section{Comparative Analysis}
+\subsection{Against Feature-Based and Optical-Flow-Based Stabilization}
+Feature-based and flow-based stabilizers remain strong baselines for general handheld video, but they incur three costs that are especially problematic here.
+
+\textbf{First, scene dependence.} Feature extraction and matching fail exactly in the scenarios where inertial stabilization remains valid: low light, textureless surfaces, motion blur, or repetitive patterns \cite{karpenko2011gyro,shi2022deepfvs}. A cylindrical panorama rig deployed in surveillance or maritime settings often encounters such scenes.
+
+\textbf{Second, frame-buffer dependence.} Content-driven motion estimation typically requires whole-frame access, frame neighborhoods, track histories, or dense flow fields. This contrasts sharply with the present architecture, in which only two source scanlines are cached at any time. A feature-based panoramic stabilizer is therefore not only more expensive computationally; it is structurally incompatible with the strict line-buffer story unless a much larger frame-resident memory system is introduced.
+
+\textbf{Third, geometric mismatch.} Even when successful, a feature-derived warp is optimized against scene correspondences, not against the intended cylindrical slice geometry of the rig. It may suppress local jitter but still leave residual cross-camera inconsistency. The proposed method instead optimizes for geometric compatibility by construction.
+
+\subsection{Against Visual-Inertial Stabilizers}
+Han \etal\ and later sensor-flow fusion methods show that inertial rotation plus visual translation is an effective compromise for monocular stabilization \cite{han2021tmc,shi2022deepfvs,yu2025sensorflow}. That design point is excellent when the camera path itself must be estimated in 3D. But in the present system, the dominant visual defect is not unknown camera translation through the scene. It is the deformation of intended cylindrical slices under roll and pitch. Consequently, the proposed algorithm does not require feature-based translation recovery to restore panoramic consistency. Instead, it uses a calibrated pitch-to-vertical-shift relation and per-camera inertial roll compensation, which is computationally lighter and stream-compatible.
+
+This difference can be interpreted as a modeling choice. Monocular visual-inertial systems estimate camera motion so that they can synthesize a smoother virtual camera. G-locked stabilization estimates only the subset of rig motion needed to restore the panorama geometry that is already known from calibration. By exploiting this prior structure, the algorithm avoids a large part of the state-estimation burden.
+
+\subsection{Against Post-Stitch 360$^\circ$ Stabilizers}
+Methods designed for 360$^\circ$ or spherical video usually operate after the wide-FOV representation already exists \cite{kopf2016omnistab,arora2018stab360,tang2018joint360}. They are powerful for immersive playback and can smooth head-motion-like disturbances. However, when the input panorama was formed from multiple narrow-FOV cameras, some defects are already baked into the panorama before those methods begin: seam inconsistencies, per-strip ripple, and cross-camera misregistration. G-locked stabilization addresses the problem one stage earlier and therefore attacks the cause rather than only the symptom.
+
+\subsection{Against Existing Hardware Stitching Engines}
+Fixed-homography hardware stitchers are efficient and remain highly relevant for embedded panoramic imaging \cite{suk2015hwstitch,jia2024fpga}. Yet they generally assume a static camera arrangement with no per-frame inertial correction. The present work inherits the good part of that philosophy --- precompute as much as possible, use burst-friendly map access, keep runtime math light --- while extending it to support frame-synchronous stabilization. The key insight is that inertial stabilization is injected not by replacing the map-based warp, but by modulating the base map through low-dimensional per-frame parameters that preserve the streaming memory contract.
+
+\begin{table*}[t]
+\caption{Conceptual comparison of stabilization families for a rigid multi-camera cylindrical panorama system.}
+\label{tab:comparisonfamilies}
+\centering
+\footnotesize
+\begin{tabularx}{\textwidth}{@{}p{2.6cm}p{2.0cm}p{2.3cm}p{1.8cm}p{1.7cm}p{2.0cm}Y@{}}
+\toprule
+Method family & Primary cue & Typical motion model & Needs scene texture & Naturally line-bufferable & Main memory tendency & Key limitation for this problem \\
+\midrule
+Global feature-based stabilization & Features / tracks & Affine / homography & Yes & No & Frame buffers + track history & Does not preserve cylindrical multi-camera geometry by construction \\
+Mesh / local warp stabilization & Features / flow & Spatially varying warp & Yes & No & Full-frame local motion fields & Hard to map to deterministic streaming hardware; may distort seams \\
+Visual-inertial monocular stabilization & IMU + features/flow & 3D pose + warp & Partly & Usually no & Frame neighborhoods + sensor buffers & Still framed as monocular path smoothing, not pre-stitch cylindrical correction \\
+Post-stitch 360$^\circ$ stabilization & Panorama features / spherical motion & Spherical / 3D-2D warp & Usually yes & No & Stitched panorama buffers & Corrects after seam formation; cannot prevent pre-stitch strip deformation \\
+Fixed-homography hardware stitcher & Calibration / static maps & Fixed homography & No at runtime & Yes & Map rows + line buffers & No frame-synchronous inertial correction \\
+\textbf{Proposed G-locked method} & \textbf{IMU + calibration} & \textbf{Per-camera affine compensation + cylindrical projection} & \textbf{No} & \textbf{Yes} & \textbf{Base-map rows + 2-line caches + bounded row staging} & \textbf{Requires accurate offline calibration and rig-specific tuning} \\
+\bottomrule
+\end{tabularx}
+\end{table*}
+
+\section{Experimental Methodology and Evaluation Protocol}
+\textbf{Self-Guide}
+\subsection{Current Experimental Basis}
+The current prototype basis consists of a six-camera cylindrical system and a full stepwise processing chain from raw frame ingestion to final panoramic composition. The implementation already fixes the operating modes, output resolutions, memory footprint model, and fixed-point signal path. For an IEEE Transactions submission, these implementation assets must now be paired with reproducible quantitative experiments and direct competitor comparisons.
+
+For an IEEE Transactions submission, these ingredients should be organized into three experimental groups.
+
+\subsection{Group I: Geometric Panorama Quality}
+This group should quantify how well the algorithm restores cylindrical consistency under controlled roll/pitch perturbations.
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item \textbf{Vertical-line preservation:} measure the deviation of known vertical scene structures from ideal straightness before and after stabilization.
+  \item \textbf{Cross-seam continuity:} measure geometric continuity of structures crossing overlap boundaries.
+  \item \textbf{Ripple suppression index:} define a line-based or grid-based deviation score over the panorama to quantify the wave-like deformation unique to the cylindrical rig.
+\end{itemize}
+These metrics are more diagnostic than raw PSNR/SSIM because they target the geometry that the method is designed to preserve.
+
+\subsection{Group II: Temporal Stability}
+Temporal stability should be evaluated using both sensor- and image-domain measures.
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item Residual frame-to-frame angular deviation after stabilization.
+  \item Stability of tracked reference trajectories in the final panorama.
+  \item Frame-to-frame transform variance in overlap regions.
+  \item Human-visible smoothness assessed by overlay trajectories and side-by-side playback.
+\end{itemize}
+A suitable stability package should include smoothed angular deviation, framewise image-quality trends, and qualitative side-by-side analysis. For the Transactions paper, these should be converted into reproducible plots and tables.
+
+\subsection{Group III: Resource and Throughput Evaluation}
+Because the present work makes a hardware claim, visual results alone are insufficient. The paper should report:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item on-chip memory breakdown,
+  \item map storage and DDR bandwidth requirements,
+  \item measured or projected clock frequency,
+  \item pixels per cycle or frames per second,
+  \item end-to-end latency from scanline ingestion to panorama availability,
+  \item interface timing for VSYNC-triggered IMU updates.
+\end{itemize}
+Several of these quantities are already available from the implementation itself, including the 2-line cache model, 32-row slice ping-pong, the MCU--FPGA control path, and the EO panorama on-chip memory footprint of roughly 1.93 MB.
+
+\subsection{Baseline Comparisons to Include}
+A strong comparison section should include the following baselines where feasible:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item \textbf{No stabilization}: raw stitched panorama.
+  \item \textbf{Post-stitch feature-based stabilization}: apply a monocular/global stabilizer on the already stitched panorama.
+  \item \textbf{Per-camera feature-based stabilization before stitching}: conventional content-driven stabilization for each camera followed by stitching.
+  \item \textbf{Gyro-only post-warp baseline}: use roll-only or global rotational compensation without G-locked per-camera geometry.
+  \item \textbf{Proposed G-locked PoC}: original Python/CV pipeline.
+  \item \textbf{Proposed G-locked V19}: line-buffer-based C++/FPGA-oriented pipeline.
+\end{enumerate}
+
+This arrangement allows the paper to show not only that the proposed method improves panorama quality, but also that its hardware-friendly structure is not an incidental implementation detail; it is part of the method's core advantage.
+
+\section{Discussion}
+\subsection{Why G-Locked Stabilization is Well Matched to FPGA}
+The success of the method is not simply that it uses IMU data. Rather, it uses IMU data in a way that admits a \emph{low-dimensional control law} for a precomputed map-based renderer. Once the base maps are prepared, the per-frame runtime problem is reduced to a handful of fixed-point parameters per camera: cosine, sine, and vertical shift plus mode-dependent constants. This is exactly the type of control surface that hardware favors.
+
+By contrast, content-driven stabilizers typically require runtime discovery of the motion model from the scene itself. That discovery stage is difficult to make deterministic in cycles, memory, and bandwidth. Even when accelerated, it tends to reintroduce frame buffering, random access, and variable control flow. The G-locked method side-steps that burden by using the rig's known cylindrical structure as a strong prior.
+
+\subsection{Limitations}
+The method is not universal. First, it assumes a rigid, calibrated multi-camera rig. Calibration errors directly degrade stabilization quality because the inertial correction is mapped into each camera through the stored offsets. Second, the affine approximation mainly targets the dominant roll and pitch effects. If the operating regime includes strong translation, very close objects, severe parallax, or large out-of-plane motion, a richer model may be needed. Third, the pitch-to-translation relation is currently parameterized and may require scene- or optics-dependent tuning. Fourth, the paper currently emphasizes the final streaming architecture; if useful for exposition, an additional historical comparison among earlier and later architecture variants could be added in a future revision.
+
+\subsection{Future Work}
+Several directions are promising:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item extend the G-locked model to incorporate depth-aware or strip-local residual correction on top of the inertial affine base,
+  \item integrate adaptive seam selection for dynamic scenes while preserving the same streaming memory contract,
+  \item validate the method on EO and IR pipelines under identical rig motion,
+  \item report full FPGA synthesis results including LUT/FF/BRAM/URAM/DSP usage and maximum frequency,
+  \item compare earlier and later architecture variants explicitly if a design-evolution subsection is retained in the final paper.
+\end{itemize}
+
+\section{Conclusion}
+This paper presented G-locked panorama stabilization, an IMU-locked, geometry-aware stabilization method for rigid multi-camera cylindrical panorama systems. The method differs from classical video stabilization because it addresses a different failure mode: roll and pitch distort the intended cylindrical slices observed by each camera and thereby corrupt the stitched panorama with ripple and seam inconsistency. By combining offline IMU-camera calibration with runtime per-camera affine compensation before cylindrical projection and blending, the proposed method restores panoramic geometric consistency without relying on scene content.
+
+The paper also formalized the hardware story behind the algorithm. The V19 realization demonstrates that inertial panorama stabilization can be implemented as a deterministic streaming pipeline based on precomputed maps, source-row buckets, RowRuns, a two-line source cache, bounded on-chip destination staging, and burst-oriented output writeback. This makes the method especially attractive for embedded systems where frame-buffer-style random source access is too costly.
+
+In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
+
+\appendices
+\section{Recommended Final Figure Set for Submission}
+The following figure set should be prepared before submission:
+\begin{enumerate}[leftmargin=*,itemsep=0pt,topsep=2pt]
+  \item problem illustration: ideal cylindrical slice versus rotated slice under roll/pitch,
+  \item system overview: calibration plus runtime G-locked pipeline,
+  \item per-camera IMU-to-camera fusion diagram,
+  \item RowRun scheduling concept with $y_0=\lfloor a_y\rfloor$,
+  \item memory storyline: LineCache $\rightarrow$ RowWindow $\rightarrow$ Slice Ping-Pong $\rightarrow$ DDR,
+  \item qualitative comparisons for representative roll/pitch cases,
+  \item final six-camera panorama before/after stabilization,
+  \item quantitative comparison table and resource table.
+\end{enumerate}
+
+% \section{Author Checklist Before Submission}
+% \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=2pt]
+%   \item Insert actual author names, affiliations, and funding.
+%   \item Replace all high-level qualitative statements with measured figures wherever available.
+%   \item Add direct V10/V17/V19 comparison once the missing architecture report is included.
+%   \item Consolidate implementation details directly into manuscript figures, equations, and tables within the paper itself.
+%   \item Verify whether yaw should be presented as horizontal panorama shift, auxiliary configuration, or omitted from the main algorithm section depending on the final implementation scope.
+%   \item Add final plots for geometric ripple suppression, temporal smoothness, and FPGA throughput/resource usage.
+% \end{itemize}
+
+\balance
+\bibliographystyle{IEEEtran}
+\bibliography{g_locked_panorama_stabilization}
+
+\end{document}
