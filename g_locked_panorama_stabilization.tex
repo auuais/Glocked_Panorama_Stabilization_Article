@@ -643,8 +643,8 @@ We now compare the proposed inertial stabilizer against the optical-flow stabili
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/horizon_ripple_3up.png}
-\caption{Net-panorama horizon ripple on an indoor capture. A \emph{true} gravity-horizontal reference (red) is composited into each camera before processing. \textbf{Top (Raw):} the reference ripples across azimuth --- the azimuth-dependent distortion predicted by \eqref{eq:seamdy2}--\eqref{eq:seamdalpha2}. \textbf{Middle (G-locked):} the per-camera pre-alignment renders it flat and continuous. \textbf{Bottom (Optical-Flow):} a single global warp shifts/rotates the whole panorama but leaves the ripple intact, consistent with $\mathrm{IHR}\!\approx\!\mathrm{IHR}_{\text{Raw}}$ in Table~\ref{tab:ripple}.}
+\includegraphics[width=\columnwidth]{figures/outdoor_horizon_ripple_3up.png}
+\caption{Net-panorama horizon ripple on an outdoor capture (Outdoor-1), at the frame of largest rig roll ($5.9^\circ$) within the 30--45\,s analysis window. A \emph{true} gravity-horizontal reference (red) is composited into each camera before processing. \textbf{Top (Raw):} the reference tilts and bends across azimuth --- the azimuth-dependent distortion predicted by \eqref{eq:seamdy2}--\eqref{eq:seamdalpha2}. \textbf{Middle (G-locked):} the per-camera pre-alignment renders it flat and continuous. \textbf{Bottom (Optical-Flow):} a single global warp rotates the whole panorama but leaves the same tilt and bend intact, consistent with $\mathrm{IHR}\!\approx\!\mathrm{IHR}_{\text{Raw}}$ in Table~\ref{tab:ripple}.}
 \label{fig:ripple}
 \end{figure}
 
@@ -921,7 +921,7 @@ Tab.~\ref{tab:smoothfull} (smoothness, full) & included & stabilization comparis
 Tab.~\ref{tab:arucofull} (ArUco, full) & included & stabilization comparison spreadsheet \\
 Tab.~\ref{tab:filtercal} (filter/calib.) & included & stabilization comparison spreadsheet \\
 Fig.~\ref{fig:imu} (IMU filtering) & included & Madgwick vs.\ accel/gyro, lag (real IMU log) \\
-Fig.~\ref{fig:ripple} (ripple 3-up) & included & frame grab, gravity-line composite \\
+Fig.~\ref{fig:ripple} (ripple 3-up) & included & outdoor frame grab, gravity-line composite \\
 Fig.~\ref{fig:stitch} (stitch panels) & included & per-seam comparison panels \\
 Fig.~\ref{fig:spectrum} (spectrum/IHR) & included & azimuthal spectrum + IHR bars \\
 Fig.~\ref{fig:geometry} (geometry) & TikZ & ideal vs.\ rotated cylindrical slice \\
