@@ -154,38 +154,50 @@ An earlier proof-of-concept already formalized the sequence of undistortion, aff
 \begin{figure*}[t]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[>=Stealth]
-  % ---- offline lane ----
-  \node[blkoff, text width=33mm] (cal) at (0,1.9)
-       {\textbf{Offline calibration}\\ intrinsics, distortion,\\ ArUco hand--eye $R_{\mathrm{off},i}$};
-  \node[ddr, text width=30mm] (maps) at (5.8,1.9)
-       {\textbf{Composed base maps}\\ undistort$\circ$cylindrical\\ (Q16.16, DDR-resident)};
-  % ---- runtime lane ----
-  \node[blk, text width=15mm] (imu)  at (0,0)    {IMU\\ gyro$+$accel};
-  \node[blk, text width=15mm] (ahrs) at (2.9,0)  {Madgwick\\ AHRS};
-  \node[blk, text width=20mm] (fuse) at (5.8,0)  {fuse $R_{\mathrm{imu}}R_{\mathrm{off},i}$\\ $\to(\alpha_i,\beta_i)$};
-  \node[blk, text width=16mm] (aff)  at (8.7,0)  {affine\\ pre-align};
-  \node[blk, text width=16mm] (sch)  at (11.2,0) {$y_0$ bucket\\ $+$ RowRun};
-  \node[blk, text width=16mm] (rnd)  at (13.7,0) {render\\ 2-line cache};
-  \node[blk, text width=14mm] (bld)  at (16.0,0) {feather\\ blend};
-  \node[blkmem, text width=17mm] (out) at (18.4,0) {slice\\ ping-pong\\ $\to$ DDR pano};
-  \node[blk, fill=blue!4, text width=20mm] (cams) at (13.7,-1.7)
-       {6 cameras (EO/IR)\\ source scanlines};
-  % ---- arrows ----
-  \draw[fl] (cal) -- (maps);
-  \draw[fl] (imu) -- (ahrs);
-  \draw[fl] (ahrs) -- (fuse);
-  \draw[fl] (fuse) -- (aff);
-  \draw[fl] (aff) -- (sch);
-  \draw[fl] (sch) -- (rnd);
-  \draw[fl] (rnd) -- (bld);
-  \draw[fl] (bld) -- (out);
-  \draw[fl] (maps) -- (aff);
-  \draw[fl] (cams) -- (rnd);
-  \node[font=\scriptsize\itshape, gray!60!black] at (2.9,1.0) {offline / once};
-  \node[font=\scriptsize\itshape, gray!60!black] at (2.9,-0.85) {runtime / per frame};
+\begin{tikzpicture}[>=Stealth,
+   cell/.style={draw=blue!55, rounded corners=1.5pt, fill=blue!12,
+                minimum width=9mm, minimum height=5mm, font=\scriptsize, inner sep=1pt},
+   fin/.style={-{Stealth[length=1.6mm]}, draw=gray!60, thin}]
+  % ===== shared front-end =====
+  \node[blkoff, text width=30mm] (cal)  at (2.0,4.0) {\textbf{Offline calibration}\\ intrinsics, distortion,\\ ArUco hand--eye $R_{\mathrm{off},i}$};
+  \node[ddr,    text width=22mm] (maps) at (6.3,4.0) {\textbf{Composed base}\\ \textbf{maps} (Q16.16, DDR)};
+  \node[blk, text width=15mm] (imu)  at (0.0,2.6) {IMU\\ gyro$+$accel};
+  \node[blk, text width=15mm] (ahrs) at (2.2,2.6) {Madgwick\\ AHRS};
+  \node[blk, text width=27mm] (pose) at (4.9,2.6) {per-camera pose\\ $R_i{=}R_{\mathrm{imu}}R_{\mathrm{off},i}$\\ $\to(\alpha_i,\Delta y_i)$};
+  \draw[fl] (cal)--(maps);
+  \draw[fl] (imu)--(ahrs);
+  \draw[fl] (ahrs)--(pose);
+  \node[font=\scriptsize\itshape, gray!55!black] at (-0.1,3.35) {offline / once};
+  \node[font=\scriptsize\itshape, gray!55!black] at (-0.1,1.95) {runtime / per frame};
+  % ===== convergence: blend + output =====
+  \node[blk, text width=13mm] (bld) at (15.1,-0.45) {feather\\ blend};
+  \node[blkmem, text width=19mm] (out) at (17.5,-0.45) {slice ping-pong\\ $\to$ DDR panorama};
+  \draw[fl] (bld)--(out);
+  % ===== per-camera parallel container =====
+  \draw[dashed, rounded corners, draw=gray!70] (6.7,2.15) rectangle (13.7,-2.35);
+  \node[font=\scriptsize\itshape, gray!55!black] at (10.2,2.42)
+       {Per-camera pipeline --- replicated and run in parallel for cameras 1--6};
+  \node[font=\scriptsize\bfseries] at (7.1,1.9)  {cam};
+  \node[font=\scriptsize\bfseries, align=center] at (8.0,1.9)  {Affine\\ $A_i$};
+  \node[font=\scriptsize\bfseries, align=center] at (10.4,1.9) {Bucket$+$RowRun\\ $B_i$};
+  \node[font=\scriptsize\bfseries, align=center] at (12.8,1.9) {Render\\ $R_i$};
+  \foreach \i/\y in {1/1.5, 2/0.85, 3/0.2, 4/-0.45, 5/-1.1, 6/-1.75}{
+    \node[font=\scriptsize] at (7.1,\y) {$\i$};
+    \node[cell] (a\i) at (8.0,\y)  {$A_{\i}$};
+    \node[cell] (b\i) at (10.4,\y) {$B_{\i}$};
+    \node[cell] (r\i) at (12.8,\y) {$R_{\i}$};
+    \draw[fl] (a\i)--(b\i);
+    \draw[fl] (b\i)--(r\i);
+    \draw[fin] (r\i.east) -- (bld.west);
+  }
+  % ===== camera scanline source =====
+  \node[blk, fill=blue!4, text width=24mm] (cams) at (12.8,-3.05) {$6\times$ camera scanlines (2-line cache)};
+  \draw[fl] (cams) -- (12.8,-2.35);
+  % ===== broadcast buses into the parallel container =====
+  \draw[fl] (pose.east) -- node[above, font=\scriptsize, pos=0.6] {$(\alpha_i,\Delta y_i)$} (6.7,0.55);
+  \draw[fl] (maps.south) -- (6.3,1.35) -- node[above, font=\scriptsize, pos=0.5] {base map} (6.7,1.35);
 \end{tikzpicture}}
-\caption{Proposed G-locked stabilization pipeline. The offline path (top) precomputes one shared cylindrical base map per camera (intrinsics, lens undistortion, and cylindrical projection composed into a single Q16.16 map, stored in DDR), and the ArUco hand--eye routine fixes the IMU--camera offsets $R_{\mathrm{off},i}$. The lightweight runtime path (bottom) converts inertial orientation into per-camera affine pre-alignment $(\alpha_i,\Delta y_i)$ that is applied to the base map \emph{before} bucketed scheduling, rendering, and feather blending. Source scanlines enter the renderer directly through a two-line cache.}
+\caption{Proposed G-locked stabilization pipeline, drawn to match the streaming C implementation. A shared front end estimates orientation (IMU $\to$ Madgwick AHRS) and composes it with the offline ArUco hand--eye extrinsics $R_{\mathrm{off},i}$ into per-camera affine parameters $(\alpha_i,\Delta y_i)$, while offline calibration precomputes one composed cylindrical base map (Q16.16, DDR-resident). Each of the six cameras is then processed in its own \emph{parallel} lane --- affine pre-alignment ($A_i$), source-row bucketing with RowRun scheduling ($B_i$), and rendering from a two-line scanline cache ($R_i$). The six rendered strips converge into feather blending and slice ping-pong writeback to DDR only \emph{after} per-camera correction, making explicit that stabilization is applied independently per camera, before any seam is formed.}
 \label{fig:pipeline}
 \end{figure*}
 
