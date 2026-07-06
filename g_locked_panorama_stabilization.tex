@@ -896,44 +896,6 @@ Outdoor-2  & 0.20 & 0.3 / 2.9 & 1.00 & 48 \\
 
 The additional segment and metric confirm the main-text reading: G-locked holds the physical marker steadier on both angle and (mostly) position, its gravity-tracking residual stays within $0.14$--$0.31^\circ$ of the accelerometer reference on all three captures, and the adaptive accelerometer gate (Section~\ref{sec:ahrs}) remains at its fully-open value (mean $1.00$) throughout, confirming that none of the three captures contains linear acceleration large enough to corrupt the gravity reference.
 
-\section{Results, Figures, and Reproducibility Index}
-\label{app:index}
-Table~\ref{tab:figindex} indexes the quantitative artifacts and the figures used in this paper. Items marked \emph{included} are rendered from measured data; items marked \emph{TikZ} are vector schematics drawn natively in the manuscript source.
-
-\begin{table}[h]
-\caption{Figure/table index and backing result assets.}
-\label{tab:figindex}
-\centering
-\footnotesize
-\begin{tabularx}{\columnwidth}{@{}p{2.3cm}cY@{}}
-\toprule
-Artifact & Status & Backing result asset \\
-\midrule
-Tab.~\ref{tab:stitch} (stitching) & included & EO/IR overlap-metric spreadsheet, $N{=}30/25$ seams \\
-Tab.~\ref{tab:ripple} (ripple/IHR) & included & horizon-ripple metric, 3 captures \\
-Tab.~\ref{tab:stabchecks} (ArUco/smoothness) & included & ArUco track + path metrics \\
-Tab.~\ref{tab:resources} (footprint) & included & on-chip memory model \\
-Tab.~\ref{tab:arch} (design space) & included & V10/V17/V19 architecture reports \\
-Tab.~\ref{tab:eopercase} (EO per-case) & included & \texttt{stitching\_comparison\_v2.xlsx}, EO\_PerCase \\
-Tab.~\ref{tab:irpercase} (IR per-case) & included & \texttt{stitching\_comparison\_v2.xlsx}, IR\_Summary \\
-Tab.~\ref{tab:ripplefull} (ripple, full) & included & stabilization comparison spreadsheet, all datasets \\
-Tab.~\ref{tab:smoothfull} (smoothness, full) & included & stabilization comparison spreadsheet, all datasets \\
-Tab.~\ref{tab:arucofull} (ArUco, full) & included & stabilization comparison spreadsheet \\
-Tab.~\ref{tab:filtercal} (filter/calib.) & included & stabilization comparison spreadsheet \\
-Fig.~\ref{fig:imu} (IMU filtering) & included & Madgwick vs.\ accel/gyro, lag (real IMU log) \\
-Fig.~\ref{fig:ripple} (ripple 3-up) & included & outdoor frame grab, gravity-line composite \\
-Fig.~\ref{fig:stitch} (stitch panels) & included & per-seam comparison panels \\
-Fig.~\ref{fig:spectrum} (spectrum/IHR) & included & azimuthal spectrum + IHR bars \\
-Fig.~\ref{fig:geometry} (geometry) & TikZ & ideal vs.\ rotated cylindrical slice \\
-Fig.~\ref{fig:pipeline} (pipeline) & TikZ & calibration $+$ runtime block diagram \\
-Fig.~\ref{fig:rowrun} (scheduling) & TikZ & $y_0{=}\lfloor a_y\rfloor$ bucketing / RowRun \\
-Fig.~\ref{fig:memory} (memory) & TikZ & LineCache$\rightarrow$RowWindow$\rightarrow$Slice$\rightarrow$DDR \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-All quantitative results are reproducible from the accompanying spreadsheets and the evaluation harness: the structural overlap metric \eqref{eq:strpsnr} (per-seam Gaussian-$\sigma{=}2$ PSNR/SSIM), the horizon-ripple decomposition \eqref{eq:ripple_decomp}--\eqref{eq:ihr}, the ArUco fiducial tracker, and the camera-path stability/ITF measures. The remaining diagrams are illustrative and do not affect the numerical claims.
-
 \balance
 \bibliographystyle{IEEEtran}
 \bibliography{g_locked_panorama_stabilization}
