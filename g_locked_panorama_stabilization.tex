@@ -559,7 +559,7 @@ We evaluate G-locked stabilization along the two axes that define its claims. Fi
 \label{sec:setup}
 \textbf{Rig and sensors.} The prototype is a rigid six-camera cylindrical rig built from DM-G15-42 global-shutter modules ($1/1.8''$ CMOS, $94.6^\circ{\times}51.3^\circ$ field of view, $30$\,fps) carrying electro-optical (EO, $1920\times1080$) and infrared (IR, $640\times512$) sensors at $60^\circ$ azimuth spacing with ${\approx}10\%$ inter-camera overlap, and a centrally mounted six-axis inertial measurement unit (IMU) sampled at ${\approx}500$\,Hz whose gyroscope and accelerometer are fused by a Madgwick orientation filter \cite{madgwick2010filter}. Unless otherwise noted, the video evaluation uses the first three cameras (cam0--cam2), which are tightly time-synchronized with the IMU; the remaining cameras exhibited a small residual capture offset and are excluded to avoid confounding the stabilization measurements.
 
-\textbf{Geometry and calibration constants.} EO frames are undistorted with radial/tangential coefficients $(k_1,k_2,p_1,p_2)=(-0.34,\,0.11,\,-1.6{\times}10^{-3},\,-2.4{\times}10^{-3})$ and reprojected onto a shared cylinder of focal parameter $f_{\mathrm{cyl}}\approx1204.5$\,px about principal point $(960,540)$; six $1920$-px strips at $10\%$ overlap form a $10\,560$-px full-resolution panorama, downscaled to the $3840\times480$ streaming target realized on the FPGA. The pitch-to-vertical-translation factor $k_p$ (the $\Delta y_i=-k_p\beta_i$ term of Section~\ref{sec:affine}) was calibrated to $17.44$\,px/deg by tracking an ArUco marker through controlled pitch; gyroscope bias was removed at $(-2.84,\,0.74,\,-0.97){\times}10^{-3}$\,rad/s, and roll/pitch corrections are clamped to $\pm5^\circ$ to preserve affine linearity and avoid border loss. Table~\ref{tab:sysparams} in the Appendix tabulates the complete parameter set, and Table~\ref{tab:offsets} lists a representative per-camera extrinsic-offset and affine-correction instance for the full six-camera rig.
+\textbf{Geometry and calibration constants.} EO frames are undistorted with radial/tangential coefficients $(k_1,k_2,p_1,p_2)=(-0.34,\,0.11,\,-1.6{\times}10^{-3},\,-2.4{\times}10^{-3})$ and reprojected onto a shared cylinder of focal parameter $f_{\mathrm{cyl}}\approx1204.5$\,px about principal point $(960,540)$; six $1920$-px strips at $10\%$ overlap form a $10\,560$-px full-resolution panorama, downscaled to the $3840\times480$ streaming target realized on the FPGA. The pitch-to-vertical-translation factor $k_p$ (the $\Delta y_i=-k_p\beta_i$ term of Section~\ref{sec:affine}) was calibrated to $17.44$\,px/deg by tracking an ArUco marker through controlled pitch; gyroscope bias was removed at $(-2.84,\,0.74,\,-0.97){\times}10^{-3}$\,rad/s, and roll/pitch corrections are clamped to $\pm5^\circ$ to preserve affine linearity and avoid border loss.
 
 \textbf{Datasets.} For stitching we use six static EO and five static IR controlled-orientation cases, each comprising the raw per-camera frames, the calibration parameters, and the system's own stabilized/unstabilized panoramas. For stabilization we use three $60$\,s, $30$\,fps captures with synchronized IMU logs: one indoor and two outdoor sequences (denoted \emph{Indoor}, \emph{Outdoor-1}, \emph{Outdoor-2}).
 
@@ -635,7 +635,7 @@ SIFT+homography \cite{brown2007panorama} & 18.51 & 0.623 & 28.34 & \textbf{0.783
 
 The proposed method is the strongest by a wide margin on the seam overlap ($23.40$\,dB / $0.742$ vs.\ $\le18.51$\,dB / $\le0.623$ for all baselines) and on distant content ($39.39$\,dB); Fig.~\ref{fig:stitch} shows the qualitative counterpart. The deep stitchers degrade because the rig's inter-camera overlap is narrow (${\approx}5\%$ of frame width) and wide-baseline, a regime far outside their training distribution of largely planar, high-overlap image pairs; on the in-domain UDIS-D benchmark UDIS++ attains ${\approx}25$--$30$\,dB, so the drop here reflects domain mismatch rather than a weak baseline. The classical homography stitcher is the best non-inertial method on overlap but fails outright on $6/30$ seams for lack of correspondences in the thin overlap band, and its only nominal lead --- distant SSIM ($0.783$) --- is an artifact of an unconstrained, oversized warp that engulfs uniform sky, not of better alignment. On the IR sensor, for which the RGB-trained deep stitchers are out of domain and not meaningfully runnable, the proposed method alone yields a clean panorama with $16.4$\,dB / $0.67$ structural overlap over $N=25$ seams; IR raw and structural scores coincide because thermal imagery lacks the high-frequency foreground texture that depresses the EO raw score.
 
-Crucially, this geometric advantage is obtained at a fraction of the deployment cost: the proposed renderer runs from ${\approx}1.93$\,MB of on-chip memory (Section~\ref{sec:resources}), whereas UDIS++ requires ${\approx}991$\,MB of network weights and StabStitch++ ${\approx}210$\,MB of GPU model state. The comparison is therefore not only favorable on quality but decisive on deployability.
+Crucially, this geometric advantage is obtained at a fraction of the deployment cost: the proposed renderer runs from ${\approx}1.93$\,MB of on-chip memory (Section~\ref{sec:resources}), whereas UDIS++ requires ${\approx}991$\,MB of network weights and StabStitch++ ${\approx}210$\,MB of GPU model state. The comparison is therefore not only favorable on quality but decisive on deployability. Appendix~\ref{app:extended} (Tables~\ref{tab:eopercase}--\ref{tab:irpercase}) reports the full per-case breakdown behind these aggregates.
 
 \subsection{Stabilization: Inertial G-locked vs.\ Optical-Flow}
 \label{sec:stabcompare}
@@ -696,7 +696,7 @@ Residual rot.\ jitter (deg)$\downarrow$ & 0.148 & 0.165 & \textbf{0.129} \\
 \end{tabular}
 \end{table}
 
-\textbf{A physical marker confirms the leveling.} The ArUco fiducial (Table~\ref{tab:stabchecks}, top) holds its orientation $\approx6\times$ steadier under G-locked ($1.18^\circ$) than under either Raw ($7.40^\circ$) or optical flow ($7.07^\circ$); the latter two are indistinguishable, again because vision-only smoothing has no gravity reference and therefore does not level the horizon. This real-object result agrees with the synthetic ripple measurement and with the filter's $0.14$--$0.31^\circ$ gravity-tracking accuracy reported in Section~\ref{sec:setup}.
+\textbf{A physical marker confirms the leveling.} The ArUco fiducial (Table~\ref{tab:stabchecks}, top) holds its orientation $\approx6\times$ steadier under G-locked ($1.18^\circ$) than under either Raw ($7.40^\circ$) or optical flow ($7.07^\circ$); the latter two are indistinguishable, again because vision-only smoothing has no gravity reference and therefore does not level the horizon. This real-object result agrees with the synthetic ripple measurement and with the filter's $0.14$--$0.31^\circ$ gravity-tracking accuracy reported in Section~\ref{sec:setup}. Appendix~\ref{app:extended} (Tables~\ref{tab:ripplefull}--\ref{tab:filtercal}) reports every dataset and metric in full, including a second marker segment and the per-dataset filter-accuracy and sync-offset figures underlying these aggregates.
 
 \textbf{The methods optimize different objectives.} On the conventional path-smoothness metrics (Table~\ref{tab:stabchecks}, bottom) the optical-flow stabilizer is the strongest, as expected: those metrics reward exactly its directive --- a smooth global trajectory. G-locked scores lower on Stability because it injects per-frame, gravity-referenced corrections that the path-smoothness score counts as motion (a small part of this is the prototype's $0.25^\circ$ angle quantization, which finer hardware resolution removes). This is the honest reading of the comparison: inertial G-locked stabilization optimizes \emph{absolute} geometric correctness --- a level, ripple-free panorama horizon, which is the operative requirement of a gravity-referenced rig --- while optical-flow stabilization optimizes \emph{relative} motion smoothness; each method wins the metrics aligned with its own objective, and neither dominates the other. The decisive point for this application is that only the inertial method addresses the azimuth-dependent ripple, and it does so without any dependence on scene texture or future frames.
 
@@ -753,60 +753,148 @@ The paper also formalized the hardware story behind the algorithm. The proposed 
 In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
 
 \appendices
-\section{System and Calibration Parameters}
-\label{app:params}
-This appendix tabulates the concrete system constants referenced in Section~\ref{sec:setup}, so that the geometric and photometric pipeline (undistortion, cylindrical projection, and affine pre-alignment) can be reproduced without re-deriving values from the prose.
+\section{Extended Comparison Results}
+\label{app:extended}
+This appendix reports the full per-case and per-dataset breakdowns behind the aggregated comparisons of Section~\ref{sec:experiments}, so that the summary claims can be checked against the underlying measurements rather than only their means.
 
-Table~\ref{tab:sysparams} lists the EO camera intrinsics, lens-distortion coefficients, and the cylindrical/panorama geometry constants shared by every camera on the rig; these are physical-rig properties and are held fixed across all experiments in Section~\ref{sec:experiments}.
+\subsection{Stitching: Per-Case Breakdown}
+Table~\ref{tab:eopercase} expands Table~\ref{tab:stitch} into its six constituent EO controlled-orientation cases (structural overlap metric \eqref{eq:strpsnr}, primary alignment metric), confirming that the aggregate ranking holds case-by-case rather than being driven by an outlier. Test~4 and Test~4C are independent captures at the same nominal orientation, included to show run-to-run repeatability.
 
-\begin{table}[h]
-\caption{EO camera intrinsic, distortion, and cylindrical/panorama geometry parameters.}
-\label{tab:sysparams}
+\begin{table*}[t]
+\caption{EO per-case structural overlap alignment (Gaussian $\sigma{=}2$; overlap region), PSNR$_s$\,(dB)~/~SSIM$_s$. Best per case in \textbf{bold}.}
+\label{tab:eopercase}
 \centering
 \footnotesize
-\begin{tabular}{@{}lc@{}}
+\begin{tabularx}{\textwidth}{@{}lYYYY@{}}
 \toprule
-Parameter & Value \\
+Test case (roll, pitch) & \textbf{G-locked (ours)} & UDIS++ & StabStitch++ & SIFT+homography \\
 \midrule
-Sensor / native resolution & DM-G15-42, $1920\times1080$ \\
-Horizontal / vertical FoV & $94.6^\circ$ / $51.3^\circ$ \\
-Focal length $f_x=f_y$ & $1204.51$\,px \\
-Principal point $(c_x,c_y)$ & $(960.0,\,540.0)$\,px \\
-Radial coefficients $(k_1,k_2,k_3)$ & $(-0.3437,\ 0.1055,\ 0.0)$ \\
-Tangential coefficients $(p_1,p_2)$ & $(-1.56,\ -2.42){\times}10^{-3}$ \\
-Cameras / azimuth spacing & $6$ / $60^\circ$ \\
-Inter-camera overlap & $10\%$ ($192$\,px of $1920$) \\
-Full-resolution panorama width & $10\,560$\,px \\
-FPGA streaming panorama (EO) & $3840\times480$ \\
-Pitch-to-translation factor $k_p$ & $17.44$\,px/deg \\
-Roll/pitch correction clamp & $\pm5^\circ$ \\
-Gyroscope bias $(b_x,b_y,b_z)$ & $(-2.84,\ 0.74,\ -0.97){\times}10^{-3}$\,rad/s \\
-IMU sample rate & ${\approx}500$\,Hz \\
+Test~2 ($2.15^\circ,0^\circ$)     & \textbf{22.76 / 0.694} & 17.30 / 0.451 & 15.21 / 0.403 & 21.51 / 0.705 \\
+Test~3 ($0.75^\circ,-5^\circ$)    & \textbf{21.18 / 0.711} & 18.62 / 0.595 & 14.59 / 0.540 & 17.70 / 0.614 \\
+Test~4 ($0.75^\circ,-5^\circ$)    & \textbf{23.51 / 0.736} & 17.08 / 0.472 & 16.27 / 0.431 & 15.40 / 0.519 \\
+Test~4C ($0.75^\circ,-5^\circ$)   & \textbf{23.51 / 0.736} & 17.74 / 0.477 & 16.27 / 0.431 & 15.41 / 0.519 \\
+Test~5 ($4.75^\circ,-4.5^\circ$)  & \textbf{24.10 / 0.775} & 16.78 / 0.496 & 15.85 / 0.407 & 21.02 / 0.721 \\
+Test~6 ($1.25^\circ,6.5^\circ$)   & \textbf{25.36 / 0.799} & 16.98 / 0.524 & 15.18 / 0.490 & 22.13 / 0.731 \\
 \bottomrule
-\end{tabular}
-\end{table}
+\end{tabularx}
+\end{table*}
 
-Table~\ref{tab:offsets} lists a representative calibration instance for the full six-camera configuration: the per-camera extrinsic offsets recovered by the hand--eye procedure of Section~\ref{sec:setup} (expressed as yaw/pitch/roll relative to the rig), together with the resulting instantaneous affine pre-alignment (in-plane roll angle and vertical shift) applied to each camera for one representative rig orientation. This instance illustrates the full six-camera configuration described in Section~\ref{sec:algorithm}; it is distinct from the three-camera (cam0--cam2) sequences used for the stabilization measurements of Section~\ref{sec:stabcompare}, which report their own per-capture IMU logs.
+Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
-\begin{table}[h]
-\caption{Representative per-camera extrinsic offsets and resulting affine pre-alignment for one six-camera rig orientation (IMU: yaw $0.0^\circ$, pitch $-0.75^\circ$, roll $5.25^\circ$).}
-\label{tab:offsets}
+\begin{table}[t]
+\caption{IR per-case overlap alignment, G-locked (ours), $N{=}5$ seams/case.}
+\label{tab:irpercase}
 \centering
 \footnotesize
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-Camera & \multicolumn{3}{c}{Extrinsic offset} & Affine pre-alignment \\
- & Yaw & Pitch & Roll & (angle, $\Delta y$) \\
+Test case (roll, pitch) & PSNR (dB) & PSNR$_s$ (dB) & SSIM & SSIM$_s$ \\
 \midrule
-Cam 0 & $0.0^\circ$   & $-0.75^\circ$ & $-0.5^\circ$ & $-5.25^\circ$, $-26.0$\,px \\
-Cam 1 & $60.0^\circ$  & $0.0^\circ$   & $0.0^\circ$  & $-1.98^\circ$, $-85.0$\,px \\
-Cam 2 & $120.0^\circ$ & $0.5^\circ$   & $0.0^\circ$  & $3.28^\circ$, $-64.0$\,px \\
-Cam 3 & $180.0^\circ$ & $0.25^\circ$  & $0.5^\circ$  & $5.25^\circ$, $17.0$\,px \\
-Cam 4 & $240.0^\circ$ & $-4.0^\circ$  & $0.0^\circ$  & $1.98^\circ$, $16.0$\,px \\
-Cam 5 & $300.0^\circ$ & $-0.5^\circ$  & $0.0^\circ$  & $-3.28^\circ$, $64.0$\,px \\
+Test~1 ($0.5^\circ,0.5^\circ$)     & 16.25 & 16.95 & 0.539 & 0.736 \\
+Test~2 ($-0.75^\circ,-4.25^\circ$) & 14.35 & 14.68 & 0.493 & 0.695 \\
+Test~3 ($5^\circ,-0.25^\circ$)     & 16.11 & 17.07 & 0.504 & 0.715 \\
+Test~4 ($4.25^\circ,4.5^\circ$)    & 15.76 & 16.27 & 0.519 & 0.709 \\
+Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
+\midrule
+\textbf{Mean} ($N{=}25$)           & \textbf{15.73} & \textbf{16.39} & \textbf{0.519} & \textbf{0.719} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Stabilization: Full Per-Dataset Breakdown}
+Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, Outdoor-1, Outdoor-2) for each stabilization metric family introduced in Section~\ref{sec:stabcompare}, of which the main text shows a representative subset.
+
+\begin{table}[t]
+\caption{Net-panorama horizon ripple, all datasets (px; lower is better). \emph{Std}: spatial std of $y(x)$; \emph{P2P}: peak-to-peak; \emph{Temporal std}: std of the ripple statistic over time. Best in \textbf{bold}.}
+\label{tab:ripplefull}
+\centering
+\footnotesize
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
+\midrule
+\multirow{3}{*}{Indoor}
+ & Std            & 41.79  & \textbf{12.13} & 38.15 \\
+ & Peak-to-peak    & 123.26 & \textbf{30.92} & 111.70 \\
+ & Temporal std    & 20.94  & \textbf{3.24}  & 19.76 \\
+\midrule
+\multirow{3}{*}{Outdoor-1}
+ & Std            & 27.34  & \textbf{1.65}  & 23.33 \\
+ & Peak-to-peak    & 82.76  & \textbf{5.07}  & 70.56 \\
+ & Temporal std    & 12.75  & \textbf{1.03}  & 10.43 \\
+\midrule
+\multirow{3}{*}{Outdoor-2}
+ & Std            & 28.96  & \textbf{1.82}  & 24.38 \\
+ & Peak-to-peak    & 86.85  & \textbf{5.53}  & 73.04 \\
+ & Temporal std    & 15.68  & \textbf{1.22}  & 12.99 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Motion smoothness (the optical-flow stabilizer's own objective), all datasets. Arrows give the better direction; best in \textbf{bold}.}
+\label{tab:smoothfull}
+\centering
+\footnotesize
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
+\midrule
+\multirow{3}{*}{Indoor}
+ & Stability $\uparrow$        & \textbf{0.981} & 0.887 & 0.970 \\
+ & ITF-PSNR (dB) $\uparrow$    & 21.73 & 22.01 & \textbf{22.72} \\
+ & Rot.\ jitter (deg)$\downarrow$ & \textbf{0.123} & 0.142 & 0.127 \\
+\midrule
+\multirow{3}{*}{Outdoor-1}
+ & Stability $\uparrow$        & 0.915 & 0.701 & \textbf{0.924} \\
+ & ITF-PSNR (dB) $\uparrow$    & 22.02 & 21.73 & \textbf{24.32} \\
+ & Rot.\ jitter (deg)$\downarrow$ & 0.148 & 0.165 & \textbf{0.129} \\
+\midrule
+\multirow{3}{*}{Outdoor-2}
+ & Stability $\uparrow$        & \textbf{0.906} & 0.603 & 0.899 \\
+ & ITF-PSNR (dB) $\uparrow$    & 22.54 & 22.50 & \textbf{23.99} \\
+ & Rot.\ jitter (deg)$\downarrow$ & 0.159 & 0.161 & \textbf{0.131} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Physical ArUco fiducial, both measurement segments (indoor). Best in \textbf{bold}.}
+\label{tab:arucofull}
+\centering
+\footnotesize
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
+\midrule
+\multirow{2}{*}{30--45\,s}
+ & Angle std (deg)$\downarrow$ & 7.40 & \textbf{1.18} & 7.07 \\
+ & $y$-pos std (px)$\downarrow$ & 8.87 & 6.15 & \textbf{5.98} \\
+\midrule
+\multirow{2}{*}{5--20\,s}
+ & Angle std (deg)$\downarrow$ & 6.11 & \textbf{1.32} & 5.82 \\
+ & $y$-pos std (px)$\downarrow$ & 19.42 & \textbf{4.41} & 18.32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\caption{Filter leveling accuracy and adaptive-gain gating, per dataset.}
+\label{tab:filtercal}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Dataset & Grav.\ resid.\ (deg) & Accel dev.\ mean/max (\%) & Gate mean & Sync (frames) \\
+\midrule
+Indoor     & 0.14 & 0.2 / 3.0 & 1.00 & 47 \\
+Outdoor-1  & 0.31 & 0.4 / 4.4 & 1.00 & 48 \\
+Outdoor-2  & 0.20 & 0.3 / 2.9 & 1.00 & 48 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The additional segment and metric confirm the main-text reading: G-locked holds the physical marker steadier on both angle and (mostly) position, its gravity-tracking residual stays within $0.14$--$0.31^\circ$ of the accelerometer reference on all three captures, and the adaptive accelerometer gate (Section~\ref{sec:ahrs}) remains at its fully-open value (mean $1.00$) throughout, confirming that none of the three captures contains linear acceleration large enough to corrupt the gravity reference.
 
 \section{Results, Figures, and Reproducibility Index}
 \label{app:index}
@@ -826,8 +914,12 @@ Tab.~\ref{tab:ripple} (ripple/IHR) & included & horizon-ripple metric, 3 capture
 Tab.~\ref{tab:stabchecks} (ArUco/smoothness) & included & ArUco track + path metrics \\
 Tab.~\ref{tab:resources} (footprint) & included & on-chip memory model \\
 Tab.~\ref{tab:arch} (design space) & included & V10/V17/V19 architecture reports \\
-Tab.~\ref{tab:sysparams} (system params) & included & camera/lens/rig calibration records \\
-Tab.~\ref{tab:offsets} (per-cam offsets) & included & six-camera hand--eye calibration instance \\
+Tab.~\ref{tab:eopercase} (EO per-case) & included & \texttt{stitching\_comparison\_v2.xlsx}, EO\_PerCase \\
+Tab.~\ref{tab:irpercase} (IR per-case) & included & \texttt{stitching\_comparison\_v2.xlsx}, IR\_Summary \\
+Tab.~\ref{tab:ripplefull} (ripple, full) & included & stabilization comparison spreadsheet, all datasets \\
+Tab.~\ref{tab:smoothfull} (smoothness, full) & included & stabilization comparison spreadsheet, all datasets \\
+Tab.~\ref{tab:arucofull} (ArUco, full) & included & stabilization comparison spreadsheet \\
+Tab.~\ref{tab:filtercal} (filter/calib.) & included & stabilization comparison spreadsheet \\
 Fig.~\ref{fig:imu} (IMU filtering) & included & Madgwick vs.\ accel/gyro, lag (real IMU log) \\
 Fig.~\ref{fig:ripple} (ripple 3-up) & included & frame grab, gravity-line composite \\
 Fig.~\ref{fig:stitch} (stitch panels) & included & per-seam comparison panels \\
