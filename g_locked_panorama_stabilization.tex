@@ -786,7 +786,7 @@ Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted 
 \label{tab:irpercase}
 \centering
 \footnotesize
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabularx}{\columnwidth}{@{}Ycccc@{}}
 \toprule
 Test case (roll, pitch) & PSNR (dB) & PSNR$_s$ (dB) & SSIM & SSIM$_s$ \\
 \midrule
@@ -798,7 +798,7 @@ Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
 \midrule
 \textbf{Mean} ($N{=}25$)           & \textbf{15.73} & \textbf{16.39} & \textbf{0.519} & \textbf{0.719} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsection{Stabilization: Full Per-Dataset Breakdown}
@@ -809,7 +809,7 @@ Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, O
 \label{tab:ripplefull}
 \centering
 \footnotesize
-\begin{tabular}{@{}llccc@{}}
+\begin{tabularx}{\columnwidth}{@{}lYccc@{}}
 \toprule
 Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \midrule
@@ -828,7 +828,7 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
  & Peak-to-peak    & 86.85  & \textbf{5.53}  & 73.04 \\
  & Temporal std    & 15.68  & \textbf{1.22}  & 12.99 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \begin{table}[t]
@@ -836,7 +836,7 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \label{tab:smoothfull}
 \centering
 \footnotesize
-\begin{tabular}{@{}llccc@{}}
+\begin{tabularx}{\columnwidth}{@{}lYccc@{}}
 \toprule
 Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \midrule
@@ -855,7 +855,7 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
  & ITF-PSNR (dB) $\uparrow$    & 22.54 & 22.50 & \textbf{23.99} \\
  & Rot.\ jitter (deg)$\downarrow$ & 0.159 & 0.161 & \textbf{0.131} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \begin{table}[t]
@@ -863,7 +863,7 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \label{tab:arucofull}
 \centering
 \footnotesize
-\begin{tabular}{@{}llccc@{}}
+\begin{tabularx}{\columnwidth}{@{}lYccc@{}}
 \toprule
 Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \midrule
@@ -875,7 +875,7 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
  & Angle std (deg)$\downarrow$ & 6.11 & \textbf{1.32} & 5.82 \\
  & $y$-pos std (px)$\downarrow$ & 19.42 & \textbf{4.41} & 18.32 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \begin{table}[t]
@@ -883,7 +883,7 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \label{tab:filtercal}
 \centering
 \footnotesize
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabularx}{\columnwidth}{@{}lYYYY@{}}
 \toprule
 Dataset & Grav.\ resid.\ (deg) & Accel dev.\ mean/max (\%) & Gate mean & Sync (frames) \\
 \midrule
@@ -891,7 +891,7 @@ Indoor     & 0.14 & 0.2 / 3.0 & 1.00 & 47 \\
 Outdoor-1  & 0.31 & 0.4 / 4.4 & 1.00 & 48 \\
 Outdoor-2  & 0.20 & 0.3 / 2.9 & 1.00 & 48 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 The additional segment and metric confirm the main-text reading: G-locked holds the physical marker steadier on both angle and (mostly) position, its gravity-tracking residual stays within $0.14$--$0.31^\circ$ of the accelerometer reference on all three captures, and the adaptive accelerometer gate (Section~\ref{sec:ahrs}) remains at its fully-open value (mean $1.00$) throughout, confirming that none of the three captures contains linear acceleration large enough to corrupt the gravity reference.
