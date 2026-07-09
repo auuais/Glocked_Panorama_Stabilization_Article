@@ -13,6 +13,7 @@
 \usepackage{balance}
 \usepackage{algorithm}
 \usepackage{algorithmic}
+\usepackage{float} % provides the [H] "exact here" placement used to lock appendix table order
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, decorations.pathreplacing}
 % Reusable block styles for the architecture/pipeline diagrams.
@@ -764,6 +765,9 @@ The paper also formalized the hardware story behind the algorithm. The proposed 
 
 In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
 
+\clearpage % start the appendix on a fresh page so its floats queue independently
+           % of pending body-text floats -- otherwise the two-column placement
+           % algorithm can render Tables VII-XII out of numerical order.
 \appendices
 \section{Extended Comparison Results}
 \label{app:extended}
@@ -772,14 +776,14 @@ This appendix reports the full per-case and per-dataset breakdowns behind the ag
 \subsection{Stitching: Extended Metrics}
 Table~\ref{tab:eofull} reports the full EO evaluation-sheet summary behind Table~\ref{tab:stitch}: both the raw-pixel and structural (Gaussian $\sigma{=}2$) PSNR/SSIM for the overlap and distant regions, together with each method's valid-seam count $N$ (of $30$ possible EO seams). The raw scores are substantially lower and more compressed across methods than the structural scores, confirming the rationale of Section~\ref{sec:metrics} for reporting the structural metric as primary: raw PSNR/SSIM in the overlap is dominated by close-range parallax that no planar warp can remove, so it is a poor discriminator of \emph{alignment} quality on its own. The reduced $N$ for StabStitch++ ($12/30$) and SIFT+homography ($24/30$) reflects outright registration failures on the thinnest, most wide-baseline seams, discussed in Section~\ref{sec:stitchcompare}.
 
-\begin{table}[t]
+\begin{table*}[t]
 \caption{Full EO stitching summary (raw-pixel and structural PSNR/SSIM, Gaussian $\sigma{=}2$; overlap and distant regions) and valid-seam count $N$ per method, of $30$ possible. Best structural score per column in \textbf{bold}.}
 \label{tab:eofull}
 \centering
 \footnotesize
-\begin{tabularx}{\columnwidth}{@{}Yccccc@{}}
+\begin{tabularx}{\textwidth}{@{}Yccccc@{}}
 \toprule
-Method & \shortstack{Ov.\ PSNR\\raw/str (dB)} & \shortstack{Ov.\ SSIM\\raw/str} & \shortstack{Dist.\ PSNR\\raw/str (dB)} & \shortstack{Dist.\ SSIM\\raw/str} & $N$ \\
+Method & Overlap PSNR raw/str (dB) & Overlap SSIM raw/str & Distant PSNR raw/str (dB) & Distant SSIM raw/str & $N$ \\
 \midrule
 \textbf{G-locked (ours)} & 15.23/\textbf{23.40} & 0.305/\textbf{0.742} & 31.18/\textbf{39.39} & 0.626/0.735 & 30 \\
 UDIS++           & 13.93/17.42 & 0.292/0.503 & 23.87/23.40 & 0.585/0.674 & 30 \\
@@ -787,11 +791,11 @@ StabStitch++     & 12.82/15.56 & 0.213/0.450 & 13.54/15.31 & 0.419/0.537 & 12 \\
 SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783} & 24 \\
 \bottomrule
 \end{tabularx}
-\end{table}
+\end{table*}
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{IR per-case overlap alignment, G-locked (ours), $N{=}5$ seams/case.}
 \label{tab:irpercase}
 \centering
@@ -814,7 +818,7 @@ Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
 \subsection{Stabilization: Full Per-Dataset Breakdown}
 Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, Outdoor-1, Outdoor-2) for each stabilization metric family introduced in Section~\ref{sec:stabcompare}, of which the main text shows a representative subset.
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Net-panorama horizon ripple, all datasets (px; lower is better). \emph{Std}: spatial std of $y(x)$; \emph{P2P}: peak-to-peak; \emph{Temporal std}: std of the ripple statistic over time. Best in \textbf{bold}.}
 \label{tab:ripplefull}
 \centering
@@ -841,7 +845,7 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \end{tabularx}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Motion smoothness (the optical-flow stabilizer's own objective), all datasets. Arrows give the better direction; best in \textbf{bold}.}
 \label{tab:smoothfull}
 \centering
@@ -868,7 +872,7 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \end{tabularx}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Physical ArUco fiducial, both measurement segments (indoor). Best in \textbf{bold}.}
 \label{tab:arucofull}
 \centering
@@ -888,7 +892,7 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \end{tabularx}
 \end{table}
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Filter leveling accuracy and adaptive-gain gating, per dataset.}
 \label{tab:filtercal}
 \centering
