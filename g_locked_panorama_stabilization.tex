@@ -793,6 +793,11 @@ SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783
 \bottomrule
 \end{tabularx}
 \end{table*}
+\clearpage % isolate Table VII on its own page in BOTH directions: a floating
+           % table* still competes in the normal queue against the eager [H]
+           % floats that follow, so a leading \clearpage alone let VIII-XII
+           % render before it anyway. This guarantees nothing after it in the
+           % source can start any earlier than the page right after it.
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
@@ -912,7 +917,6 @@ Outdoor-2  & 0.20 & 0.3 / 2.9 & 1.00 & 48 \\
 The additional segment and metric confirm the main-text reading: G-locked holds the physical marker steadier on both angle and (mostly) position, its gravity-tracking residual stays within $0.14$--$0.31^\circ$ of the accelerometer reference on all three captures, and the adaptive accelerometer gate (Section~\ref{sec:ahrs}) remains at its fully-open value (mean $1.00$) throughout, confirming that none of the three captures contains linear acceleration large enough to corrupt the gravity reference.
 
 \balance
-\clearpage % start References on a fresh page rather than wherever the appendix ends
 \bibliographystyle{IEEEtran}
 \bibliography{g_locked_panorama_stabilization}
 
