@@ -801,6 +801,9 @@ SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
+\clearpage % each appendix table below is individually isolated on its own
+           % page: [H] alone does not guarantee strict source order even
+           % among same-type floats once several are queued close together.
 \begin{table}[H]
 \caption{IR per-case overlap alignment, G-locked (ours), $N{=}5$ seams/case.}
 \label{tab:irpercase}
@@ -824,6 +827,7 @@ Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
 \subsection{Stabilization: Full Per-Dataset Breakdown}
 Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, Outdoor-1, Outdoor-2) for each stabilization metric family introduced in Section~\ref{sec:stabcompare}, of which the main text shows a representative subset.
 
+\clearpage
 \begin{table}[H]
 \caption{Net-panorama horizon ripple, all datasets (px; lower is better). \emph{Std}: spatial std of $y(x)$; \emph{P2P}: peak-to-peak; \emph{Temporal std}: std of the ripple statistic over time. Best in \textbf{bold}.}
 \label{tab:ripplefull}
@@ -851,6 +855,7 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \end{tabularx}
 \end{table}
 
+\clearpage
 \begin{table}[H]
 \caption{Motion smoothness (the optical-flow stabilizer's own objective), all datasets. Arrows give the better direction; best in \textbf{bold}.}
 \label{tab:smoothfull}
@@ -878,6 +883,7 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \end{tabularx}
 \end{table}
 
+\clearpage
 \begin{table}[H]
 \caption{Physical ArUco fiducial, both measurement segments (indoor). Best in \textbf{bold}.}
 \label{tab:arucofull}
@@ -898,6 +904,7 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \end{tabularx}
 \end{table}
 
+\clearpage
 \begin{table}[H]
 \caption{Filter leveling accuracy and adaptive-gain gating, per dataset.}
 \label{tab:filtercal}
