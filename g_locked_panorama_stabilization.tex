@@ -14,6 +14,18 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{placeins} % \FloatBarrier: locks float order at a point without forcing a page break
+% Allow denser float packing in the table-heavy appendix: IEEEtran's defaults are
+% conservative about how much of a page/column may be covered by floats before the
+% rest is deferred, which -- combined with \FloatBarrier's ordering constraint --
+% otherwise leaves large blank areas instead of packing tables tightly.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.8}
+\renewcommand{\dblfloatpagefraction}{0.8}
+\setcounter{topnumber}{4}
+\setcounter{dbltopnumber}{3}
+\setcounter{totalnumber}{6}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, decorations.pathreplacing}
 % Reusable block styles for the architecture/pipeline diagrams.
