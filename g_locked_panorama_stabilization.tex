@@ -33,7 +33,8 @@
 
 \author{Muhammad~Awais and Youngbae~Hwang%
 \thanks{Manuscript submitted June~2026. \textit{(Corresponding author: Youngbae Hwang.)}}%
-\thanks{M.~Awais and Y.~Hwang are with the Department of Electronics and Computer Engineering, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: m.awais@chungbuk.ac.kr; ybhwang@chungbuk.ac.kr).}}
+\thanks{M.~Awais is with the Department of Intelligent Systems and Robotics, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: [author email to be added]).}%
+\thanks{Y.~Hwang is with the Department of Electronics Engineering, College of Electrical and Computer Engineering, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: ybhwang@cbnu.ac.kr).}}
 
 \markboth{IEEE Transactions, Vol.~XX, No.~XX, 2026}{AWAIS AND HWANG: G-LOCKED PANORAMA STABILIZATION}
 
@@ -765,9 +766,6 @@ The paper also formalized the hardware story behind the algorithm. The proposed 
 
 In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
 
-\clearpage % start the appendix on a fresh page so its floats queue independently
-           % of pending body-text floats -- otherwise the two-column placement
-           % algorithm can render Tables VII-XII out of numerical order.
 \appendices
 \section{Extended Comparison Results}
 \label{app:extended}
@@ -776,6 +774,9 @@ This appendix reports the full per-case and per-dataset breakdowns behind the ag
 \subsection{Stitching: Extended Metrics}
 Table~\ref{tab:eofull} reports the full EO evaluation-sheet summary behind Table~\ref{tab:stitch}: both the raw-pixel and structural (Gaussian $\sigma{=}2$) PSNR/SSIM for the overlap and distant regions, together with each method's valid-seam count $N$ (of $30$ possible EO seams). The raw scores are substantially lower and more compressed across methods than the structural scores, confirming the rationale of Section~\ref{sec:metrics} for reporting the structural metric as primary: raw PSNR/SSIM in the overlap is dominated by close-range parallax that no planar warp can remove, so it is a poor discriminator of \emph{alignment} quality on its own. The reduced $N$ for StabStitch++ ($12/30$) and SIFT+homography ($24/30$) reflects outright registration failures on the thinnest, most wide-baseline seams, discussed in Section~\ref{sec:stitchcompare}.
 
+\clearpage % force this page to be genuinely empty right before the table* request,
+           % so it claims this exact top-of-page slot instead of being deferred
+           % past the [H]-forced single-column tables that follow it in source.
 \begin{table*}[t]
 \caption{Full EO stitching summary (raw-pixel and structural PSNR/SSIM, Gaussian $\sigma{=}2$; overlap and distant regions) and valid-seam count $N$ per method, of $30$ possible. Best structural score per column in \textbf{bold}.}
 \label{tab:eofull}
@@ -911,15 +912,16 @@ Outdoor-2  & 0.20 & 0.3 / 2.9 & 1.00 & 48 \\
 The additional segment and metric confirm the main-text reading: G-locked holds the physical marker steadier on both angle and (mostly) position, its gravity-tracking residual stays within $0.14$--$0.31^\circ$ of the accelerometer reference on all three captures, and the adaptive accelerometer gate (Section~\ref{sec:ahrs}) remains at its fully-open value (mean $1.00$) throughout, confirming that none of the three captures contains linear acceleration large enough to corrupt the gravity reference.
 
 \balance
+\clearpage % start References on a fresh page rather than wherever the appendix ends
 \bibliographystyle{IEEEtran}
 \bibliography{g_locked_panorama_stabilization}
 
-% \begin{IEEEbiographynophoto}{Muhammad Awais}
-%
-% \end{IEEEbiographynophoto}
+\begin{IEEEbiographynophoto}{Muhammad Awais}
+received the M.S. degree in electronics and computer engineering from Chungbuk National University, Cheongju, Republic of Korea, in 2025. He is currently pursuing the Ph.D. degree with the Department of Intelligent Systems and Robotics, Chungbuk National University. His research interests include real-time image processing, multi-camera panoramic stitching and stabilization, inertial sensor fusion, and FPGA-oriented vision architectures.
+\end{IEEEbiographynophoto}
 
-% \begin{IEEEbiographynophoto}{Youngbae Hwang}
-%
-% \end{IEEEbiographynophoto}
+\begin{IEEEbiographynophoto}{Youngbae Hwang}
+received the B.S. degree in electrical engineering and the M.S. and Ph.D. degrees in robotics and computer vision from the Korea Advanced Institute of Science and Technology (KAIST), Daejeon, Republic of Korea, in 2001, 2003, and 2009, respectively. He is currently an Associate Professor with the Department of Electronics Engineering, College of Electrical and Computer Engineering, Chungbuk National University, Cheongju, Republic of Korea. His research interests include sensor noise modeling, low-level image processing, deep-learning-based object detection and classification, medical image processing, and autonomous vehicles, robots, and drones.
+\end{IEEEbiographynophoto}
 
 \end{document}
