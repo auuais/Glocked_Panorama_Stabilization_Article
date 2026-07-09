@@ -13,7 +13,7 @@
 \usepackage{balance}
 \usepackage{algorithm}
 \usepackage{algorithmic}
-\usepackage{float} % provides the [H] "exact here" placement used to lock appendix table order
+\usepackage{placeins} % \FloatBarrier: locks float order at a point without forcing a page break
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds, decorations.pathreplacing}
 % Reusable block styles for the architecture/pipeline diagrams.
@@ -33,7 +33,7 @@
 
 \author{Muhammad~Awais and Youngbae~Hwang%
 \thanks{Manuscript submitted June~2026. \textit{(Corresponding author: Youngbae Hwang.)}}%
-\thanks{M.~Awais is with the Department of Intelligent Systems and Robotics, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: [author email to be added]).}%
+\thanks{M.~Awais is with the Department of Intelligent Systems and Robotics, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: auuais@live.com).}%
 \thanks{Y.~Hwang is with the Department of Electronics Engineering, College of Electrical and Computer Engineering, Chungbuk National University, Cheongju 28644, Republic of Korea (e-mail: ybhwang@cbnu.ac.kr).}}
 
 \markboth{IEEE Transactions, Vol.~XX, No.~XX, 2026}{AWAIS AND HWANG: G-LOCKED PANORAMA STABILIZATION}
@@ -774,9 +774,6 @@ This appendix reports the full per-case and per-dataset breakdowns behind the ag
 \subsection{Stitching: Extended Metrics}
 Table~\ref{tab:eofull} reports the full EO evaluation-sheet summary behind Table~\ref{tab:stitch}: both the raw-pixel and structural (Gaussian $\sigma{=}2$) PSNR/SSIM for the overlap and distant regions, together with each method's valid-seam count $N$ (of $30$ possible EO seams). The raw scores are substantially lower and more compressed across methods than the structural scores, confirming the rationale of Section~\ref{sec:metrics} for reporting the structural metric as primary: raw PSNR/SSIM in the overlap is dominated by close-range parallax that no planar warp can remove, so it is a poor discriminator of \emph{alignment} quality on its own. The reduced $N$ for StabStitch++ ($12/30$) and SIFT+homography ($24/30$) reflects outright registration failures on the thinnest, most wide-baseline seams, discussed in Section~\ref{sec:stitchcompare}.
 
-\clearpage % force this page to be genuinely empty right before the table* request,
-           % so it claims this exact top-of-page slot instead of being deferred
-           % past the [H]-forced single-column tables that follow it in source.
 \begin{table*}[t]
 \caption{Full EO stitching summary (raw-pixel and structural PSNR/SSIM, Gaussian $\sigma{=}2$; overlap and distant regions) and valid-seam count $N$ per method, of $30$ possible. Best structural score per column in \textbf{bold}.}
 \label{tab:eofull}
@@ -793,18 +790,12 @@ SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783
 \bottomrule
 \end{tabularx}
 \end{table*}
-\clearpage % isolate Table VII on its own page in BOTH directions: a floating
-           % table* still competes in the normal queue against the eager [H]
-           % floats that follow, so a leading \clearpage alone let VIII-XII
-           % render before it anyway. This guarantees nothing after it in the
-           % source can start any earlier than the page right after it.
+\FloatBarrier % lock Table VII's position: nothing declared after this point
+              % can render before it, without forcing a page break.
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
-\clearpage % each appendix table below is individually isolated on its own
-           % page: [H] alone does not guarantee strict source order even
-           % among same-type floats once several are queued close together.
-\begin{table}[H]
+\begin{table}[t]
 \caption{IR per-case overlap alignment, G-locked (ours), $N{=}5$ seams/case.}
 \label{tab:irpercase}
 \centering
@@ -823,12 +814,12 @@ Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
 \bottomrule
 \end{tabularx}
 \end{table}
+\FloatBarrier
 
 \subsection{Stabilization: Full Per-Dataset Breakdown}
 Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, Outdoor-1, Outdoor-2) for each stabilization metric family introduced in Section~\ref{sec:stabcompare}, of which the main text shows a representative subset.
 
-\clearpage
-\begin{table}[H]
+\begin{table}[t]
 \caption{Net-panorama horizon ripple, all datasets (px; lower is better). \emph{Std}: spatial std of $y(x)$; \emph{P2P}: peak-to-peak; \emph{Temporal std}: std of the ripple statistic over time. Best in \textbf{bold}.}
 \label{tab:ripplefull}
 \centering
@@ -854,9 +845,9 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \bottomrule
 \end{tabularx}
 \end{table}
+\FloatBarrier
 
-\clearpage
-\begin{table}[H]
+\begin{table}[t]
 \caption{Motion smoothness (the optical-flow stabilizer's own objective), all datasets. Arrows give the better direction; best in \textbf{bold}.}
 \label{tab:smoothfull}
 \centering
@@ -882,9 +873,9 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \bottomrule
 \end{tabularx}
 \end{table}
+\FloatBarrier
 
-\clearpage
-\begin{table}[H]
+\begin{table}[t]
 \caption{Physical ArUco fiducial, both measurement segments (indoor). Best in \textbf{bold}.}
 \label{tab:arucofull}
 \centering
@@ -903,9 +894,9 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \bottomrule
 \end{tabularx}
 \end{table}
+\FloatBarrier
 
-\clearpage
-\begin{table}[H]
+\begin{table}[t]
 \caption{Filter leveling accuracy and adaptive-gain gating, per dataset.}
 \label{tab:filtercal}
 \centering
@@ -928,7 +919,7 @@ The additional segment and metric confirm the main-text reading: G-locked holds 
 \bibliography{g_locked_panorama_stabilization}
 
 \begin{IEEEbiographynophoto}{Muhammad Awais}
-received the M.S. degree in electronics and computer engineering from Chungbuk National University, Cheongju, Republic of Korea, in 2025. He is currently pursuing the Ph.D. degree with the Department of Intelligent Systems and Robotics, Chungbuk National University. His research interests include real-time image processing, multi-camera panoramic stitching and stabilization, inertial sensor fusion, and FPGA-oriented vision architectures.
+received the B.S. degree in electronics engineering from COMSATS University Islamabad, Pakistan, in 2016, and the M.S. degree in information engineering from Chungbuk National University, Cheongju, Republic of Korea, in 2025. He is currently pursuing the Ph.D. degree with the Department of Intelligent Systems and Robotics, Chungbuk National University. Since 2017 he has worked as a Research Engineer in industry, most recently with Vista Technology Limited, South Korea, where his projects have spanned robot manipulation, deep-learning-based perception, semantic Visual SLAM, and IMU-based panoramic-camera stabilization for embedded, FPGA-integrated systems. His research interests include real-time image processing, multi-camera panoramic stitching and stabilization, inertial sensor fusion, embedded real-time system design, and FPGA-oriented vision architectures.
 \end{IEEEbiographynophoto}
 
 \begin{IEEEbiographynophoto}{Youngbae Hwang}
