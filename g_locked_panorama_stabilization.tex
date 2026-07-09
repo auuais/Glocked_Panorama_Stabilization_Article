@@ -209,7 +209,7 @@ An earlier proof-of-concept already formalized the sequence of undistortion, aff
   \draw[fl] (cams) -- (12.8,-2.35);
   % ===== broadcast buses into the parallel container =====
   \draw[fl] (pose.east) -- node[above, font=\scriptsize, pos=0.6] {$(\alpha_i,\Delta y_i)$} (6.7,0.55);
-  \draw[fl] (maps.south) -- (6.3,1.35) -- node[above, font=\scriptsize, pos=0.5] {base map} (6.7,1.35);
+  \draw[fl] (maps.south) -- (7.3,1.35) -- node[above, font=\scriptsize, pos=0.5] {base map} (6.7,1.35);
 \end{tikzpicture}}
 \caption{Proposed G-locked stabilization pipeline, drawn to match the streaming C implementation. A shared front end estimates orientation (IMU $\to$ Madgwick AHRS) and composes it with the offline ArUco hand--eye extrinsics $R_{\mathrm{off},i}$ into per-camera affine parameters $(\alpha_i,\Delta y_i)$, while offline calibration precomputes one composed cylindrical base map (Q16.16, DDR-resident). Each of the six cameras is then processed in its own \emph{parallel} lane --- affine pre-alignment ($A_i$), source-row bucketing with RowRun scheduling ($B_i$), and rendering from a two-line scanline cache ($R_i$). The six rendered strips converge into feather blending and slice ping-pong writeback to DDR only \emph{after} per-camera correction, making explicit that stabilization is applied independently per camera, before any seam is formed.}
 \label{fig:pipeline}
