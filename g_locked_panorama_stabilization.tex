@@ -14,11 +14,10 @@
 \usepackage{float}
 \usepackage{algorithm}
 \usepackage{algorithmic}
-\usepackage{placeins} % \FloatBarrier: locks float order at a point without forcing a page break
 % Allow denser float packing in the table-heavy appendix: IEEEtran's defaults are
 % conservative about how much of a page/column may be covered by floats before the
-% rest is deferred, which -- combined with \FloatBarrier's ordering constraint --
-% otherwise leaves large blank areas instead of packing tables tightly.
+% rest is deferred, which can otherwise leave large blank areas instead of packing
+% tables tightly.
 \renewcommand{\topfraction}{0.9}
 \renewcommand{\dbltopfraction}{0.9}
 \renewcommand{\textfraction}{0.05}
@@ -829,9 +828,8 @@ In summary, the contribution is not only a better panorama stabilizer, but a bet
 This appendix reports the full per-case and per-dataset breakdowns behind the aggregated comparisons of Section~\ref{sec:experiments}, so that the summary claims can be checked against the underlying measurements rather than only their means.
 
 \subsection{Stitching: Extended Metrics}
-Table~\ref{tab:eofull} reports the full EO evaluation-sheet summary behind Table~\ref{tab:stitch}: both the raw-pixel and structural (Gaussian $\sigma{=}2$) PSNR/SSIM for the overlap and distant regions, together with each method's valid-seam count $N$ (of $30$ possible EO seams). The raw scores are substantially lower and more compressed across methods than the structural scores, confirming the rationale of Section~\ref{sec:metrics} for reporting the structural metric as primary: raw PSNR/SSIM in the overlap is dominated by close-range parallax that no planar warp can remove, so it is a poor discriminator of \emph{alignment} quality on its own. The reduced $N$ for StabStitch++ ($12/30$) and SIFT+homography ($24/30$) reflects outright registration failures on the thinnest, most wide-baseline seams, discussed in Section~\ref{sec:stitchcompare}.
 
-\begin{table*}[t]
+\begin{table*}[!t]
 \caption{Full EO stitching summary (raw-pixel and structural PSNR/SSIM, Gaussian $\sigma{=}2$; overlap and distant regions) and valid-seam count $N$ per method, of $30$ possible. Best structural score per column in \textbf{bold}.}
 \label{tab:eofull}
 \centering
@@ -847,8 +845,8 @@ SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783
 \bottomrule
 \end{tabularx}
 \end{table*}
-\FloatBarrier % lock Table VII's position: nothing declared after this point
-              % can render before it, without forcing a page break.
+
+Table~\ref{tab:eofull} reports the full EO evaluation-sheet summary behind Table~\ref{tab:stitch}: both the raw-pixel and structural (Gaussian $\sigma{=}2$) PSNR/SSIM for the overlap and distant regions, together with each method's valid-seam count $N$ (of $30$ possible EO seams). The raw scores are substantially lower and more compressed across methods than the structural scores, confirming the rationale of Section~\ref{sec:metrics} for reporting the structural metric as primary: raw PSNR/SSIM in the overlap is dominated by close-range parallax that no planar warp can remove, so it is a poor discriminator of \emph{alignment} quality on its own. The reduced $N$ for StabStitch++ ($12/30$) and SIFT+homography ($24/30$) reflects outright registration failures on the thinnest, most wide-baseline seams, discussed in Section~\ref{sec:stitchcompare}.
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
