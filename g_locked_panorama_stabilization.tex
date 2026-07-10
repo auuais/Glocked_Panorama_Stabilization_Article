@@ -11,6 +11,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{balance}
+\usepackage{float}
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{placeins} % \FloatBarrier: locks float order at a point without forcing a page break
@@ -814,6 +815,13 @@ The paper also formalized the hardware story behind the algorithm. The proposed 
 In summary, the contribution is not only a better panorama stabilizer, but a better \emph{fit} between stabilization theory and hardware reality. The proposed method closes the gap between geometric panoramic correction and deployable FPGA architecture, offering a credible path from algorithm to real-time embedded implementation.
 
 \appendices
+\setlength{\textfloatsep}{7pt plus 1pt minus 2pt}
+\setlength{\floatsep}{6pt plus 1pt minus 2pt}
+\setlength{\dbltextfloatsep}{7pt plus 1pt minus 2pt}
+\setlength{\dblfloatsep}{6pt plus 1pt minus 2pt}
+\setlength{\intextsep}{6pt plus 1pt minus 2pt}
+\setlength{\abovecaptionskip}{3pt plus 1pt minus 1pt}
+\setlength{\belowcaptionskip}{3pt plus 1pt minus 1pt}
 \section{Extended Comparison Results}
 \label{app:extended}
 This appendix reports the full per-case and per-dataset breakdowns behind the aggregated comparisons of Section~\ref{sec:experiments}, so that the summary claims can be checked against the underlying measurements rather than only their means.
@@ -842,7 +850,7 @@ SIFT+homography  & 15.16/18.51 & 0.418/0.623 & 26.91/28.34 & 0.683/\textbf{0.783
 
 Table~\ref{tab:irpercase} gives the corresponding IR per-case results. As noted in Section~\ref{sec:stitchcompare}, the RGB-trained deep stitchers are out of domain on thermal imagery and are not meaningfully runnable, so only the proposed method is evaluated.
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{IR per-case overlap alignment, G-locked (ours), $N{=}5$ seams/case.}
 \label{tab:irpercase}
 \centering
@@ -861,12 +869,11 @@ Test~5 ($0.75^\circ,6.25^\circ$)   & 16.17 & 16.96 & 0.540 & 0.740 \\
 \bottomrule
 \end{tabularx}
 \end{table}
-\FloatBarrier
 
 \subsection{Stabilization: Full Per-Dataset Breakdown}
 Tables~\ref{tab:ripplefull}--\ref{tab:filtercal} report every dataset (Indoor, Outdoor-1, Outdoor-2) for each stabilization metric family introduced in Section~\ref{sec:stabcompare}, of which the main text shows a representative subset.
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Net-panorama horizon ripple, all datasets (px; lower is better). \emph{Std}: spatial std of $y(x)$; \emph{P2P}: peak-to-peak; \emph{Temporal std}: std of the ripple statistic over time. Best in \textbf{bold}.}
 \label{tab:ripplefull}
 \centering
@@ -892,9 +899,8 @@ Dataset & Metric (px) & Raw & \textbf{G-locked} & Optical-Flow \\
 \bottomrule
 \end{tabularx}
 \end{table}
-\FloatBarrier
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Motion smoothness (the optical-flow stabilizer's own objective), all datasets. Arrows give the better direction; best in \textbf{bold}.}
 \label{tab:smoothfull}
 \centering
@@ -920,9 +926,8 @@ Dataset & Metric & Raw & G-locked & \textbf{Optical-Flow} \\
 \bottomrule
 \end{tabularx}
 \end{table}
-\FloatBarrier
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Physical ArUco fiducial, both measurement segments (indoor). Best in \textbf{bold}.}
 \label{tab:arucofull}
 \centering
@@ -941,9 +946,8 @@ Segment & Metric & Raw & \textbf{G-locked} & Optical-Flow \\
 \bottomrule
 \end{tabularx}
 \end{table}
-\FloatBarrier
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{Filter leveling accuracy and adaptive-gain gating, per dataset.}
 \label{tab:filtercal}
 \centering
