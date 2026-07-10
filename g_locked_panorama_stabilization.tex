@@ -556,11 +556,13 @@ This pipeline is deterministic, streamable, and mode-stable: the same memory mov
 
   % ===== DDR video frame ping-pong =====
   \node[frameddr, text width=30mm] (wrframe) at (21.6,-2.0) {DDR frame B\\ inactive write target\\ 1920$\times$1080};
-  \node[frameddr, text width=30mm] (rdframe) at (14.9,-2.0) {DDR frame A\\ active read target\\ 1920$\times$1080};
-  \node[tinyblk, text width=22mm] (hdsdi) at (10.7,-2.0) {HD-SDI\\ BT.1120\\ stream};
+  \node[frameddr, text width=30mm] (rdframe) at (15.9,-2.0) {DDR frame A\\ active read target\\ 1920$\times$1080};
+  \node[tinyblk, text width=22mm] (hdsdi) at (18.8,-4.0) {HD-SDI\\ BT.1120\\ stream};
   \draw[fl] (fold.south) -- node[right, font=\scriptsize, align=left] {rows 0--479: left half\\ rows 480--959: right half\\ rows 960--1079: black} (wrframe.north);
   \draw[fl] (rdframe)--(hdsdi);
+  \draw[fl] (wrframe)--(hdsdi);
   \draw[flf, dashed] (wrframe)-- node[below, font=\scriptsize] {swap at frame boundary} (rdframe);
+  \draw[flf, dashed] (rdframe)-- (wrframe) ;
   \node[font=\scriptsize\itshape, gray!60!black] at (18.1,1.25) {random writes remain on-chip; DDR video traffic is sequential and banked by frame};
 \end{tikzpicture}}
 \caption{Deterministic streaming memory architecture and pixel storyline. At startup the QSPI-resident base-map package is validated and expanded into a DDR RowRun bucket schedule plus small alpha LUTs. During each frame, six YUV422 source-row lanes render into small per-camera preblend placeholders; a deterministic merge writes the result into one shared active RowWindow rather than six full RowWindows. Completed rows pass through a 32-row push buffer and are folded directly into the inactive 1920$\times$1080 DDR video frame: the left and right halves of the 3840$\times$480 panorama occupy rows 0--479 and 480--959, while rows 960--1079 are black. The HD-SDI reader consumes the opposite DDR frame, and the buffers swap only at a frame boundary.}
