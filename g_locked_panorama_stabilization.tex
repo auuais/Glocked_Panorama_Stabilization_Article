@@ -175,15 +175,15 @@ An earlier proof-of-concept already formalized the sequence of undistortion, aff
                minimum width=10.5mm, minimum height=4.8mm, font=\scriptsize, inner sep=1pt},
    fin/.style={-{Stealth[length=1.5mm]}, draw=gray!60, thin}]
   % ===== offline and runtime front-end =====
-  \node[blkoff, text width=30mm] (cal)  at (0.7,-1.25) {\textbf{Offline calibration}\\ intrinsics, distortion,\\ ArUco hand--eye $R_{\mathrm{off},i}$};
-  \node[ddr, text width=26mm] (maps) at (4.3,-1.25) {\textbf{Shared cylindrical}\\ \textbf{base maps}\\ Q16.16};
+  \node[blkoff, text width=30mm] (cal)  at (1.2,-1.25) {\textbf{Offline calibration}\\ intrinsics, distortion,\\ ArUco hand--eye $R_{\mathrm{off},i}$};
+  \node[ddr, text width=26mm] (maps) at (5.05,-1.25) {\textbf{Shared cylindrical}\\ \textbf{base maps}\\ Q16.16};
   \node[blk, text width=15mm] (imu)  at (-0.2,1.15) {IMU\\ gyro$+$accel};
   \node[blk, text width=16mm] (ahrs) at (1.9,1.15) {Madgwick\\ AHRS};
   \node[blk, text width=31mm] (pose) at (4.8,1.15) {camera-frame correction\\ $R_i{=}R_{\mathrm{imu}}R_{\mathrm{off},i}$\\ $\to(\alpha_i,\Delta y_i)$};
   \draw[fl] (cal)--(maps);
   \draw[fl] (imu)--(ahrs);
   \draw[fl] (ahrs)--(pose);
-  \node[font=\scriptsize\itshape, gray!55!black] at (0.0,1.75) {offline / calibration};
+  \node[font=\scriptsize\itshape, gray!55!black] at (0.0,-2.0) {offline / calibration};
   \node[font=\scriptsize\itshape, gray!55!black] at (0.0,0.55) {runtime / per frame};
 
   % ===== per-camera parallel lanes =====
