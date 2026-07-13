@@ -526,13 +526,45 @@ This pipeline is deterministic, streamable, and mode-stable: the same memory mov
   \node[frameddr, text width=24mm] (qspi) at (0.0,3.35) {QSPI asset\\ manifest $+$\\ base maps};
   \node[tinyblk, text width=23mm] (load) at (3.0,3.35) {startup load\\ CRC/version\\ check};
   \node[tinyblk, text width=27mm] (gen) at (6.0,3.35) {startup generator\\ RowRuns $+$\\ alpha LUTs};
-  \node[frameddr, text width=27mm] (sched) at (6.0,1.85) {DDR RowRun\\ $y_0$ bucket\\ index $+$ pool};
+  \node[frameddr, text width=27mm] (sched) at (6.0,1.85) {per-frame dynamic\\ bucket/RowRun \\ builder};
+  \node[tinyblk, text width=27mm] (pos) at (2.5,1.85)  {\textbf{frame pose}\\
+   $c_{15,i},\,s_{15,i},\,\Delta y_i$\\
+   ($i=0,\ldots,5$;)};
   \node[tinymem, text width=22mm] (lut) at (12.0,3.35) {BRAM/regs\\ alpha LUTs};
   \draw[fl] (qspi)--(load);
   \draw[fl] (load)--(gen);
   \draw[fl] (gen)--(sched);
   \draw[fl] (gen)--(lut);
+  \draw[fl] (pos)--(sched);
   \node[font=\scriptsize\itshape, gray!60!black] at (3.0,4.05) {once after DDR calibration};
+
+
+  % ===== Shadow Regs ======
+
+%   \node[frameddr, text width=25mm] (ini) at (0.0,8.0)
+%   {\textbf{configuration}\\
+%    \texttt{.ini}/QSPI defaults\\
+%    blend, crop, output Res};
+
+% \node[tinyblk, text width=24mm] (mcu) at (3.0,8.0)
+%   {\textbf{MCU control}\\
+%    parse/validate\\
+%    register writes};
+
+% \node[tinymem, text width=28mm] (shadow) at (3.0,6.5)
+%   {\textbf{FPGA shadow regs}\\
+%    pending configuration};
+
+% \node[tinymem, text width=29mm] (cfg) at (3.0,5.0)
+%   {\textbf{active configuration}\\
+%    geometry, seams, blend,\\
+%    crop/fold, output mode};
+
+% \draw[fl] (ini) -- (mcu);
+% \draw[fl] (mcu) -- node[right, font=\scriptsize]
+%   {register-write interface} (shadow);
+% \draw[fl] (shadow) -- node[right, font=\scriptsize]
+%   {commit at SOF/VSYNC} (cfg);
 
   % ===== streaming frame path =====
   \node[tinyblk, fill=blue!4, text width=22mm] (cam) at (0.0,0.45) {$6\times$ EO\\ YUV422\\ streams};
