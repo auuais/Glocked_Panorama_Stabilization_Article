@@ -163,64 +163,143 @@ The algorithm has two stages:
   \item \textbf{Runtime stabilization}: acquire IMU orientation, map it into each camera frame, derive a low-complexity affine correction, and apply that correction before cylindrical projection, cropping, and blending.
 \end{enumerate}
 
-An earlier proof-of-concept already formalized the sequence of undistortion, affine stabilization, cylindrical projection, cropping, and feather blending. The later C++/FPGA-oriented realization preserves the same core geometric idea while reorganizing execution into a deterministic streaming schedule.
+An earlier proof-of-concept already formalized the sequence of undistortion, affine stabilization, cylindrical projection, cropping, and feather blending. The later C++/FPGA-oriented realization preserves the same geometry while reorganizing execution into the deterministic streaming contract of Fig.~\ref{fig:pipeline}. Offline calibration supplies distortion-composed Q16.16 base maps and fixed IMU-to-camera extrinsics; at runtime, the current inertial pose modifies the map-derived source coordinates before any seam blend is formed.
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
 \resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[>=Stealth,
-   cell/.style={draw=blue!55, rounded corners=1.5pt, fill=blue!12,
-                minimum width=9.5mm, minimum height=4.8mm, font=\scriptsize, inner sep=1pt},
-   pre/.style={draw=purple!60!black, rounded corners=1.5pt, fill=purple!10,
-               minimum width=10.5mm, minimum height=4.8mm, font=\scriptsize, inner sep=1pt},
-   fin/.style={-{Stealth[length=1.5mm]}, draw=gray!60, thin}]
-  % ===== offline and runtime front-end =====
-  \node[blkoff, text width=30mm] (cal)  at (1.2,-1.25) {\textbf{Offline calibration}\\ intrinsics, distortion,\\ ArUco hand--eye $R_{\mathrm{off},i}$};
-  \node[ddr, text width=26mm] (maps) at (5.05,-1.25) {\textbf{Shared cylindrical}\\ \textbf{base maps}\\ Q16.16};
-  \node[blk, text width=15mm] (imu)  at (-0.2,1.15) {IMU\\ gyro$+$accel};
-  \node[blk, text width=16mm] (ahrs) at (1.9,1.15) {Madgwick\\ AHRS};
-  \node[blk, text width=31mm] (pose) at (4.8,1.15) {camera-frame correction\\ $R_i{=}R_{\mathrm{imu}}R_{\mathrm{off},i}$\\ $\to(\alpha_i,\Delta y_i)$};
-  \draw[fl] (cal)--(maps);
-  \draw[fl] (imu)--(ahrs);
-  \draw[fl] (ahrs)--(pose);
-  \node[font=\scriptsize\itshape, gray!55!black] at (0.0,-2.0) {offline / calibration};
-  \node[font=\scriptsize\itshape, gray!55!black] at (0.0,0.55) {runtime / per frame};
+\begin{tikzpicture}[
+  archblk/.style={rectangle, rounded corners=1.3pt, draw=blue!75!black,
+    fill=blue!6, line width=0.7pt, minimum width=28mm, minimum height=13mm,
+    text width=25mm, align=center, font=\small, inner sep=2.2pt},
+  archmem/.style={archblk, draw=orange!85!black, fill=orange!12},
+  archctl/.style={archblk, draw=purple!75!black, fill=purple!7},
+  archout/.style={archblk, draw=green!60!black, fill=green!8},
+  archneutral/.style={archblk, draw=black!60, fill=black!3},
+  archflow/.style={-{Latex[length=2.2mm,width=1.45mm]}, line width=0.85pt, draw=black!72},
+  archmemflow/.style={-{Latex[length=2.2mm,width=1.45mm]}, line width=0.85pt, draw=orange!85!black},
+  archcfg/.style={-{Latex[length=2.2mm,width=1.45mm]}, line width=0.8pt, draw=purple!75!black, dashed},
+  archlabel/.style={font=\scriptsize, text=black!72, fill=white, fill opacity=0.96,
+    text opacity=1, inner sep=1pt},
+  archgroup/.style={draw=black!28, fill=black!1.5, rounded corners=2pt,
+    line width=0.65pt, inner sep=4.2mm},
+  archgtitle/.style={font=\bfseries\normalsize, text=black!76}]
 
-  % ===== per-camera parallel lanes =====
-  \draw[dashed, rounded corners, draw=gray!70] (7.05,2.55) rectangle (15.55,-2.45);
-  \node[font=\scriptsize\itshape, gray!55!black] at (11.3,3.05)
-       {Six EO lanes: source-row buckets are processed in parallel before deterministic merge};
-  \node[font=\scriptsize\bfseries] at (7.45,1.78) {cam};
-  \node[font=\scriptsize\bfseries, align=center] at (8.65,2.11) {YUV422\\ 2-line cache};
-  \node[font=\scriptsize\bfseries, align=center] at (10.75,2.11) {$y_0$ bucket\\ RowRuns};
-  \node[font=\scriptsize\bfseries, align=center] at (12.75,2.11) {bilinear\\ render};
-  \node[font=\scriptsize\bfseries, align=center] at (14.55,2.11) {preblend\\ row};
-  \foreach \i/\y in {1/1.38, 2/0.78, 3/0.18, 4/-0.42, 5/-1.02, 6/-1.62}{
-    \node[font=\scriptsize] at (7.45,\y) {$\i$};
-    \node[cell] (lc\i) at (8.65,\y) {$L_{\i}$};
-    \node[cell] (rr\i) at (10.75,\y) {$B_{\i}$};
-    \node[cell] (rn\i) at (12.75,\y) {$R_{\i}$};
-    \node[pre]  (pb\i) at (14.55,\y) {$P_{\i}$};
-    \draw[fl] (lc\i)--(rr\i);
-    \draw[fl] (rr\i)--(rn\i);
-    \draw[fl] (rn\i)--(pb\i);
-    \draw[fin] (pb\i.east) -- (16.05,-0.12);
-  }
-  \node[blk, fill=blue!4, text width=24mm] (cams) at (11.30,-3.05) {$6\times$ frame-synchronous\\ EO YUV422 streams};
-  \draw[fl] (cams.north) -- (11.30,-2.45);
-  \draw[fl] (pose.east) -- (6.65,1.15) -- (6.65,0.35) -- (7.05,0.35);
-  \draw[fl] (maps.east) -- (6.65,-1.25) -- (6.65,-0.35) -- (7.05,-0.35);
+  % A. Frame-rate inertial and configuration path.
+  \node[archneutral] (imu) at (0,8.2)
+    {\textbf{IMU samples}\\gyro $+$ accelerometer\\frame-synchronous pose};
+  \node[archblk] (ahrs) at (3.6,8.2)
+    {\textbf{Madgwick AHRS}\\orientation estimate\\$R_{\mathrm{imu}}$};
+  \node[archctl] (mcu) at (7.2,8.2)
+    {\textbf{MCU controller}\\\texttt{.ini}/NVM geometry,\\seams, crop, and pose};
+  \node[archctl] (active) at (10.8,8.2)
+    {\textbf{FPGA register banks}\\shadow $\rightarrow$ active\\atomic commit at SOF};
+  \node[archctl] (pose) at (14.4,8.2)
+    {\textbf{Per-camera frame pose}\\$c_{15,i},\,s_{15,i}$ (Q1.15)\\$\Delta y_i$ (Q16.16)};
 
-  % ===== deterministic convergence and output =====
-  \node[blk, text width=23mm] (merge) at (17.3,-0.12) {deterministic\\ merge $+$ feather};
-  \node[blkmem, fill=orange!30, text width=25mm] (rw) at (20.75,-0.12) {shared RowWindow\\ row retire};
-  \node[blkmem, text width=24mm] (push) at (20.75,-1.62) {32-row push\\ DDR/HD stream};
-  \draw[fl] (merge)--(rw);
-  \draw[fl] (rw)--(push);
+  \draw[archflow] (imu)--(ahrs);
+  \draw[archcfg] (ahrs)--(mcu);
+  \draw[archcfg] (mcu)--(active);
+  \draw[archcfg] (active)--(pose);
+
+  % B. Static calibration assets and dynamic stabilized scheduling.
+  \node[archneutral] (qspi) at (0,4.8)
+    {\textbf{QSPI/JTAG assets}\\versioned calibration\\and base-map package};
+  \node[archblk] (loader) at (3.6,4.8)
+    {\textbf{Asset loader}\\CRC/geometry check\\DDR/BRAM transfer};
+  \node[archmem] (maps) at (7.2,4.8)
+    {\textbf{DDR base maps}\\X/Y Q16.16\\2,059,344 bytes};
+  \node[archmem] (mapcache) at (10.8,4.8)
+    {\textbf{Base-map row cache}\\AXI4-MM bursts\\active map rows};
+  \node[archblk] (dynamic) at (14.4,4.8)
+    {\textbf{Dynamic RowRun builders}\\$6\times$ pose-dependent\\source-row schedules};
+  \node[archctl] (alpha) at (18.0,4.8)
+    {\textbf{Alpha-LUT registers}\\overlap windows and\\Y/C blend weights};
+
+  \draw[archmemflow] (qspi)--(loader);
+  \draw[archmemflow] (loader)--(maps);
+  \draw[archmemflow] (maps)--(mapcache);
+  \draw[archflow] (mapcache)--(dynamic);
+  \draw[archcfg] (pose)--(dynamic);
+  \draw[archcfg] (active.north)--++(0,0.42)-|(alpha.north);
+
+  % C. Six synchronized streaming lanes and shared accumulation.
+  \node[archneutral] (inputs) at (0,0.7)
+    {\textbf{Six EO inputs}\\YUV422, \texttt{Strobe\_out}\\common frame epoch};
+  \node[archmem] (linecache) at (3.6,0.7)
+    {\textbf{Six line caches}\\two YUV422 lines/camera\\46,080 bytes total};
+  \node[archblk] (render) at (14.4,0.7)
+    {\textbf{Six RowRun renderers}\\fixed-point bilinear\\YUV422 sampling};
+  \node[archmem] (preblend) at (18.0,0.7)
+    {\textbf{Six preblend buffers}\\camera-row fragments\\valid/weight metadata};
+  \node[archblk] (merge) at (21.6,0.7)
+    {\textbf{Deterministic merge}\\fixed camera order\\Y/C feather blend};
+  \node[archmem] (rowwindow) at (25.2,0.7)
+    {\textbf{Shared RowWindow}\\\texttt{ACTIVE\_BUFFER}\\180 rows; 1,382,400 bytes};
+
+  \draw[archflow] (inputs)--(linecache);
+  \draw[archflow] (linecache)--
+    node[archlabel, midway, above=1.2mm]{six synchronized row pairs}(render);
+  \draw[archflow] (dynamic)--
+    node[archlabel, midway, right=1.1mm]{pose-dependent RowRuns}(render);
+  \draw[archflow] (render)--(preblend);
+  \draw[archflow] (preblend)--(merge);
+  \draw[archflow] (merge)--(rowwindow);
+  \draw[archcfg] (alpha.east)-|(merge.north);
+
+  % D. Row retirement, raster folding, and banked HD-SDI output.
+  \node[archmem] (push) at (25.2,-3.4)
+    {\textbf{Two push buffers}\\$2\times32$ panorama rows\\491,520 bytes};
+  \node[archblk] (fold) at (21.6,-3.4)
+    {\textbf{Fold-on-write}\\$3840\times480\rightarrow1920\times1080$\\$2\times480$ active $+$ 120 black};
+  \node[archout] (writer) at (18.0,-3.4)
+    {\textbf{AXI4 frame writer}\\sequential bursts\\inactive DDR bank};
+  \node[archmem] (frames) at (14.4,-3.4)
+    {\textbf{DDR frames A/B}\\1920$\times$1080 YUV422\\4,147,200 bytes each};
+  \node[archout] (reader) at (10.8,-3.4)
+    {\textbf{AXI4 video reader}\\opposite DDR bank\\raster timing};
+  \node[archneutral] (sdi) at (7.2,-3.4)
+    {\textbf{BT.1120 / HD-SDI}\\1920$\times$1080 raster\\bank swap at SOF};
+
+  \draw[archflow] (rowwindow)--(push);
+  \draw[archflow] (push)--(fold);
+  \draw[archflow] (fold)--(writer);
+  \draw[archmemflow] (writer)--(frames);
+  \draw[archmemflow] (frames)--(reader);
+  \draw[archflow] (reader)--(sdi);
+  \draw[archcfg] (active.north)--++(0,0.75)-|(27.3,-4.9)-|(fold.south);
+
+  % Architectural group frames.
+  \begin{scope}[on background layer]
+    \node[archgroup, fit=(imu)(ahrs)(mcu)(active)(pose)] (ga) {};
+    \node[archgroup, fit=(qspi)(loader)(maps)(mapcache)(dynamic)(alpha)] (gb) {};
+    \node[archgroup, fit=(inputs)(linecache)(render)(preblend)(merge)(rowwindow)] (gc) {};
+    \node[archgroup, fit=(sdi)(reader)(frames)(writer)(fold)(push)] (gd) {};
+  \end{scope}
+  \node[archgtitle, anchor=south west] at ([xshift=-2mm,yshift=2mm]ga.north west)
+    {A. Frame-synchronous inertial pose and configuration};
+  \node[archgtitle, anchor=south west] at ([xshift=-2mm,yshift=2mm]gb.north west)
+    {B. Calibration-map access and pose-dependent RowRun scheduling};
+  \node[archgtitle, anchor=south west] at ([xshift=-2mm,yshift=2mm]gc.north west)
+    {C. Six-camera streaming render, preblend, and shared accumulation};
+  \node[archgtitle, anchor=south west] at ([xshift=-2mm,yshift=2mm]gd.north west)
+    {D. Push buffering, DDR frame ping-pong, and HD-SDI output};
+
+  % Compact legend and scope statement.
+  \draw[archflow] (0,-5.55)--++(1.25,0);
+  \node[anchor=west, font=\small] at (1.43,-5.55) {stream/computed data};
+  \draw[archmemflow] (6.2,-5.55)--++(1.25,0);
+  \node[anchor=west, font=\small] at (7.63,-5.55) {DDR/BRAM transfer};
+  \draw[archcfg] (12.3,-5.55)--++(1.25,0);
+  \node[anchor=west, font=\small] at (13.73,-5.55) {configuration/control};
+  \node[anchor=east, font=\small, text=black!62] at (26.8,-5.55)
+    {Stabilization mode: all RowRun schedules are pose-dependent.};
 \end{tikzpicture}}
-\caption{Proposed G-locked stabilization pipeline, drawn as the streaming hardware contract. Offline calibration produces a shared cylindrical base map in Q16.16 format, while the runtime IMU and Madgwick AHRS produce per-camera roll/pitch correction parameters $(\alpha_i,\Delta y_i)$ through the calibrated hand--eye extrinsics $R_{\mathrm{off},i}$. Each EO camera remains in YUV422 and is processed through a two-line source cache, source-row bucket/RowRun scheduler, fixed-point bilinear renderer, and a small per-camera preblend row placeholder. The six placeholders are then merged in a deterministic camera order into a shared RowWindow/row-retirement path, so per-camera stabilization is complete before seam blending and output writeback.}
+\caption{EO panorama stabilization architecture used in this work. IMU samples are fused by the Madgwick AHRS; the MCU combines the resulting orientation with calibrated camera offsets and updateable geometry/seam parameters, and the FPGA atomically commits the quantized per-camera pose at SOF. Static Q16.16 base-map rows are burst-read from DDR, whereas the source-row bucket/RowRun schedule is generated from the current $(c_{15,i},s_{15,i},\Delta y_i)$ pose. Six synchronized YUV422 lanes render from two-line caches into preblend placeholders, after which deterministic Y/C feathering accumulates into one shared 180-row RowWindow. Retired rows pass through $2{\times}32$-row staging, are folded from 3840$\times$480 into a black-padded 1920$\times$1080 ping-pong frame, and are read by HD-SDI from the opposite DDR bank.}
 \label{fig:pipeline}
 \end{figure*}
+
+The upper two paths of Fig.~\ref{fig:pipeline} operate at startup or frame rate, while the lower pixel path advances with synchronized source-row pairs. Parameters loaded from \texttt{.ini}/NVM---including crop, overlap, seam, and feather settings---are held in MCU-visible FPGA shadow registers and become active together only at a frame boundary. The QSPI/JTAG package therefore contains only static calibration assets; stabilization does not reuse an identity-pose RowRun pool. Instead, the dynamic builders apply the current Q1.15 roll terms and Q16.16 vertical shift to the active base-map rows, bucket the resulting coordinates by source-row pair, and issue the corresponding RowRuns to the six renderers. Keeping the camera fragments separate until the deterministic merge ensures that the per-camera correction is complete before overlap weighting, while the shared RowWindow confines random destination writes to bounded on-chip storage.
 
 \subsection{Shared Cylindrical Reprojection and Azimuth-Dependent Pre-Alignment}
 The core novelty of the proposed algorithm is that the cylindrical reprojection is \emph{not} camera-specific. A single cylindrical projection is computed once from one intrinsic parameter set $(f_x,f_y,c_x,c_y)$ and one field-of-view specification. This defines a shared base map
@@ -525,51 +604,19 @@ This pipeline is deterministic, streamable, and mode-stable: the same memory mov
   % ===== startup asset path =====
   \node[frameddr, text width=24mm] (qspi) at (0.0,3.35) {QSPI asset\\ manifest $+$\\ base maps};
   \node[tinyblk, text width=23mm] (load) at (3.0,3.35) {startup load\\ CRC/version\\ check};
-  \node[tinyblk, text width=27mm] (gen) at (6.0,3.35) {startup generator\\ RowRuns $+$\\ alpha LUTs};
-  \node[frameddr, text width=27mm] (sched) at (6.0,1.85) {per-frame dynamic\\ bucket/RowRun \\ builder};
-  \node[tinyblk, text width=27mm] (pos) at (2.5,1.85)  {\textbf{frame pose}\\
-   $c_{15,i},\,s_{15,i},\,\Delta y_i$\\
-   ($i=0,\ldots,5$;)};
+  \node[tinyblk, text width=27mm] (gen) at (6.0,3.35) {startup initializer\\ base-row index $+$\\ alpha LUTs};
+  \node[frameddr, text width=27mm] (sched) at (6.0,1.85) {DDR base maps\\ X/Y Q16.16\\ row-major};
   \node[tinymem, text width=22mm] (lut) at (12.0,3.35) {BRAM/regs\\ alpha LUTs};
   \draw[fl] (qspi)--(load);
   \draw[fl] (load)--(gen);
   \draw[fl] (gen)--(sched);
   \draw[fl] (gen)--(lut);
-  \draw[fl] (pos)--(sched);
   \node[font=\scriptsize\itshape, gray!60!black] at (3.0,4.05) {once after DDR calibration};
-
-
-  % ===== Shadow Regs ======
-
-%   \node[frameddr, text width=25mm] (ini) at (0.0,8.0)
-%   {\textbf{configuration}\\
-%    \texttt{.ini}/QSPI defaults\\
-%    blend, crop, output Res};
-
-% \node[tinyblk, text width=24mm] (mcu) at (3.0,8.0)
-%   {\textbf{MCU control}\\
-%    parse/validate\\
-%    register writes};
-
-% \node[tinymem, text width=28mm] (shadow) at (3.0,6.5)
-%   {\textbf{FPGA shadow regs}\\
-%    pending configuration};
-
-% \node[tinymem, text width=29mm] (cfg) at (3.0,5.0)
-%   {\textbf{active configuration}\\
-%    geometry, seams, blend,\\
-%    crop/fold, output mode};
-
-% \draw[fl] (ini) -- (mcu);
-% \draw[fl] (mcu) -- node[right, font=\scriptsize]
-%   {register-write interface} (shadow);
-% \draw[fl] (shadow) -- node[right, font=\scriptsize]
-%   {commit at SOF/VSYNC} (cfg);
 
   % ===== streaming frame path =====
   \node[tinyblk, fill=blue!4, text width=22mm] (cam) at (0.0,0.45) {$6\times$ EO\\ YUV422\\ streams};
   \node[tinymem, text width=23mm] (lc) at (3.0,0.45) {six 2-line\\ caches\\ $\approx46$\,kB};
-  \node[tinyblk, text width=25mm] (bucket) at (6.0,0.45) {six $y_0$\\ bucket/RowRun\\ render lanes};
+  \node[tinyblk, text width=25mm] (bucket) at (6.0,0.45) {six dynamic $y_0$\\ RowRun builder/\\ render lanes};
   \node[tinymem, text width=26mm] (pre) at (9.0,0.45) {small per-cam\\ preblend\\ placeholders};
   \node[tinyblk, text width=24mm] (merge) at (12.0,0.45) {deterministic\\ feather merge};
   \node[tinymem, fill=orange!30, text width=27mm] (rw) at (15.1,0.45) {shared RowWindow\\ \texttt{ACTIVE\_BUFFER}=180\\ $\approx1.38$\,MB};
@@ -582,7 +629,7 @@ This pipeline is deterministic, streamable, and mode-stable: the same memory mov
   \draw[fl] (merge)--(rw);
   \draw[fl] (rw)--(push);
   \draw[fl] (push)--(fold);
-  \draw[fl] (sched.south) -- node[right, font=\scriptsize] {bucket bursts} (bucket.north);
+  \draw[fl] (sched.south) -- node[right, font=\scriptsize] {map-row bursts} (bucket.north);
   \draw[fl] (lut.south) -- (merge.north);
 
   % ===== DDR video frame ping-pong =====
@@ -596,7 +643,7 @@ This pipeline is deterministic, streamable, and mode-stable: the same memory mov
   \draw[flf, dashed] (rdframe)-- (wrframe) ;
   \node[font=\scriptsize\itshape, gray!60!black] at (18.1,1.25) {random writes remain on-chip; DDR video traffic is sequential and banked by frame};
 \end{tikzpicture}}
-\caption{Deterministic streaming memory architecture and pixel storyline. At startup the QSPI-resident base-map package is validated and expanded into a DDR RowRun bucket schedule plus small alpha LUTs. During each frame, six YUV422 source-row lanes render into small per-camera preblend placeholders; a deterministic merge writes the result into one shared active RowWindow rather than six full RowWindows. Completed rows pass through a 32-row push buffer and are folded directly into the inactive 1920$\times$1080 DDR video frame: the left and right halves of the 3840$\times$480 panorama occupy rows 0--479 and 480--959, while rows 960--1079 are black. The HD-SDI reader consumes the opposite DDR frame, and the buffers swap only at a frame boundary.}
+\caption{Deterministic streaming memory architecture and pixel storyline. At startup the QSPI-resident base-map package is validated and loaded into row-major DDR storage together with a compact base-row index and small alpha LUTs. During each stabilized frame, the active pose drives dynamic $y_0$ bucket/RowRun generation while six YUV422 source-row lanes render into small per-camera preblend placeholders; a deterministic merge writes the result into one shared active RowWindow rather than six full RowWindows. Completed rows pass through a 32-row push buffer and are folded directly into the inactive 1920$\times$1080 DDR video frame: the left and right halves of the 3840$\times$480 panorama occupy rows 0--479 and 480--959, while rows 960--1079 are black. The HD-SDI reader consumes the opposite DDR frame, and the buffers swap only at a frame boundary.}
 \label{fig:memory}
 \end{figure*}
 
